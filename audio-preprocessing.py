@@ -10,7 +10,7 @@ Version: 1.0.0
 """
 
 import os
-from yt_dlp import YoutubeDL
+import yt_dlp
 import librosa
 import soundfile as sf
 import noisereduce
