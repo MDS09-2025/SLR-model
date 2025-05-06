@@ -55,7 +55,7 @@ def download_youtube_audio(video_url_file='Youtube_urls.txt', output_path='Raw_A
     print(f"Downloaded {len(video_urls)} audio files to {output_path}.")
 
 
-def preprocess_audio(input_path='Raw_Audio', output_path='Clean_Audio', target_sr=16000, 
+def preprocess_audio(input_path='Raw_Audio', output_path='Clean_Audio', target_sr=48000, 
                      noise_reduction=True, chunk_size=10.0):
     """
     This function preprocesses audio files by conducting audio normalization,
