@@ -1,0 +1,7 @@
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/common_voice_en_41912063_chunk2.mp3
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/common_voice_en_41912054_chunk2.mp3
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/1585-157660-0013_chunk2.flac
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/common_voice_en_41912096_chunk2.mp3
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/common_voice_en_41912065_chunk2.mp3
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/1585-157660-0001_chunk2.flac
+/Users/annsleyshee/Desktop/SLR-model/Clean_Audio/1585-157660-0008_chunk2.flac
