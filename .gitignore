@@ -1,0 +1,10 @@
+# Root-level ignores
+*.log
+.DS_Store
+
+# Ignore Angular node_modules from subproject
+Talk-2-Hands/node_modules/
+Talk-2-Hands/dist/
+
+# Ignore Models
+t5-finetuned-aslg/
