@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "SLR-website": {
+    "talk-2-hands-web": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -61,10 +61,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "SLR-website:build:production"
+              "buildTarget": "talk-2-hands-web:build:production"
             },
             "development": {
-              "buildTarget": "SLR-website:build:development"
+              "buildTarget": "talk-2-hands-web:build:development"
             }
           },
           "defaultConfiguration": "development"
