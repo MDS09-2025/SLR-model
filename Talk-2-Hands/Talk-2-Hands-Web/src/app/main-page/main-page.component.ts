@@ -16,7 +16,10 @@ export class MainPageComponent {
 
   sendLink() {
     this.translateService.sendLink(this.mediaLink).subscribe({
-      next: (res) => console.log('Backend response:', res),
+      next: (res) => {
+        console.log('Backend response:', res);
+        this.mediaLink = ''; // Clear the input field after sending
+      },
       error: (err) => console.error('Error sending link:', err)
     });
   }
