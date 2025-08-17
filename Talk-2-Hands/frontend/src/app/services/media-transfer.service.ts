@@ -6,8 +6,9 @@ import { Injectable } from '@angular/core';
 
 export class MediaTransferService {
   private file: File | null = null;
+  private link: string | null = null;
 
-  setFile(file: File) {
+  setFile(file: File | null) {
     this.file = file;
   }
 
@@ -17,5 +18,13 @@ export class MediaTransferService {
 
   clearFile() {
     this.file = null;
+  }
+
+  setLink(url: string | null) { 
+    this.link = url; 
+  }
+
+  getLink() { 
+    return this.link; 
   }
 }

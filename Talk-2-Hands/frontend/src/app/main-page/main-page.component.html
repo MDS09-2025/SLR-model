@@ -2,52 +2,66 @@
     <app-nav-bar></app-nav-bar>
     <div class="flex flex-col lg:flex-row items-center justify-between mt-12 lg:mt-20">
     <!-- Left Section: Text -->
-    <div class="flex-1 max-w-2xl lg:px-12">
+    <div class="flex-1 max-w-7xl lg:px-12">
 
         <!-- Title -->
-        <h1 class="text-3xl md:text-6xl font-bold font-redhat leading-tight text-transparent bg-clip-text bg-gradient-to-r from-[#B6C3FF] to-[#5271FF]">
-            Tech that translates <br />
+        <h1 class="text-3xl md:text-4xl lg:text-6xl 2xl:text-7xl font-bold font-redhat leading-tight text-transparent bg-clip-text bg-gradient-to-r from-[#B6C3FF] to-[#5271FF]">
+            Tech that translates 
             the world – <br />
             <span class="italic font-extrabold text-white">just for you</span>
         </h1>
 
-        <p class="text-xl font-redhat text-neutral-200 mt-6 leading-relaxed">
-            Translate any media using AI-powered Speech to Sign <br />
+        <p class="text-xl lg:text-2xl 2xl:text-3xl font-redhat text-neutral-200 mt-6 leading-relaxed">
+            Translate any media using AI-powered Speech to Sign 
             Language Recognition technology
         </p>
 
-        <div class="flex flex-col items-center w-full max-w-md mt-6">
+        <div class="flex flex-col items-center w-full max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 
+            mt-6 space-y-6">
             <!-- Input Field To Paste Link -->
-            <input type="text" [(ngModel)]="mediaLink" placeholder="Paste a media link here to be translated"
-                class="px-4 py-3 rounded-full text-black w-full shadow-md font-redhat focus:ring-primary focus:ring-2" />
+            <input 
+                type="text" 
+                [(ngModel)]="mediaLink" 
+                placeholder="Paste a media link here to be translated"
+                class="px-4 py-3 rounded-full text-black w-full shadow-md font-redhat focus:ring-primary focus:ring-2" 
+                [disabled]="!!selectedFile"
+            />
             
             <!-- Hidden File Input for Media Upload -->
-            <input type="file" #mediaInput accept="audio/*,video/*" class="hidden" (change)="OnMediaSelected($event)" />
+            <input type="file" #mediaInput accept="audio/*,video/*" class="hidden" (change)="onFilePicked($event)" />
 
-            <!-- Button To Upload Media -->
-            <button
-                class="mt-6 rounded-full px-6 py-3 text-white font-semibold
-                    bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90 transition w-fit mx-auto"
-                    (click)="mediaInput.click()">
-                Upload Media
-            </button>
+            <!-- Buttons Wrapper -->
+            <div class="flex flex-col md:flex-row md:space-x-4 mt-6 w-full justify-center">
+                <!-- Upload Button -->
+                <button 
+                    (click)="mediaInput.click()"
+                    class="w-48 rounded-full px-6 py-3 text-white font-semibold
+                        bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90 transition"
+                    [disabled]="!!mediaLink.trim()">
+                    Upload Media
+                </button>
 
-            <!-- Button To Send Link / File to Translate
-            <button (click)="sendLink()"
-                class="mt-6 rounded-full px-6 py-3 text-white font-semibold
-                    bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90 transition w-fit mx-auto">
-                Translate
-            </button> -->
+                <!-- Translate Button -->
+                <button (click)="translate()"
+                    class="w-48 mt-4 md:mt-0 rounded-full px-6 py-3 text-white font-semibold
+                        bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90 transition">
+                    Translate to Sign
+                </button>
+            </div>
+            <div *ngIf="selectedFile" class="mt-4 text-sm text-grey-300 text-center">
+                <p><strong>File:</strong> {{ selectedFile?.name }}</p>
+                <p><strong>Type:</strong> {{ selectedFile?.type }}</p>
+            </div>
         </div>
     </div>
 
     <!-- Right Section: Image-->
     <div class="flex-1 flex justify-center items-center mt-12 lg:mt-0">
         <img src="/images/ImageGrid.svg" alt="Icon Grid"
-        class="absolute right-0 bottom-0 w-full max-w-[495px] z-0 hidden lg:block" />
+        class="absolute right-0 bottom-0 w-[40vw] max-w-[650px] z-0 hidden lg:block" />
 
         <!-- 3D Avatar -->
         <img src="/images/Avatar.svg" alt="3D Character"
-            class="absolute right-20 bottom-0 lg:w-[360px] hidden lg:block" />
+            class="absolute right-20 bottom-0 w-[28vw] max-w-[480px] hidden lg:block" />
     </div>
 </div>

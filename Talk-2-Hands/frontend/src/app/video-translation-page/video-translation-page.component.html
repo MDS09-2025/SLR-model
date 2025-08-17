@@ -3,11 +3,6 @@
   <!-- Navbar -->
   <app-nav-bar></app-nav-bar>
 
-  <!-- Page header -->
-  <header class="max-w-5xl mx-auto flex items-center gap-3 mb-6 relative z-10">
-    <span class="text-xl font-semibold">Video Translation</span>
-  </header>
-
   <!-- Main -->
   <main class="max-w-5xl mx-auto relative z-10">
     <!-- Main video player card -->
@@ -26,16 +21,6 @@
     <!-- 3D rendering logic (later)-->
     
     <div class="mt-4 flex items-center justify-between gap-3">
-      <div class="flex gap-2">
-        <input type="file" accept="video/*" class="hidden" #fileInput (change)="onFile($event)">
-        <!-- Temporary upload-->
-        <button
-          class="rounded-full px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white/90 transition"
-          (click)="fileInput.click()">
-          Upload
-        </button>
-      </div>
-
       <div class="flex gap-3">
         <!-- Download -->
         <button
@@ -51,7 +36,5 @@
         </button>
       </div>
     </div>
-
-    <p class="mt-3 text-sm text-neutral-300">{{ status }}</p>
   </main>
 </div>
