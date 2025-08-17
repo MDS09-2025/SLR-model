@@ -8,3 +8,21 @@ Talk-2-Hands/dist/
 
 # Ignore Models
 t5-finetuned-aslg/
+*.pt
+*.bin
+*.onnx
+*.safetensors
+*.ckpt
+*.pth
+*.tar.gz
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Transformer configs & vocabs (big or auto-generated)
+transformer_model*.json
+transformer_vocab.json
+transformer_model.pt

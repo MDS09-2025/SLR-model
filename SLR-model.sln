@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Talk-2-Hands", "Talk-2-Hands", "{86C94BD7-42DE-5791-6B77-7D091D978D4C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Talk2Hands.Backend", "Talk-2-Hands\Talk2Hands.Backend\Talk2Hands.Backend.csproj", "{F51A5343-29CA-5E77-3F90-FDE281D57B59}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F51A5343-29CA-5E77-3F90-FDE281D57B59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F51A5343-29CA-5E77-3F90-FDE281D57B59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F51A5343-29CA-5E77-3F90-FDE281D57B59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F51A5343-29CA-5E77-3F90-FDE281D57B59}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F51A5343-29CA-5E77-3F90-FDE281D57B59} = {86C94BD7-42DE-5791-6B77-7D091D978D4C}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A1C82BFA-089D-4A97-BF49-A6EB52A84288}
+	EndGlobalSection
+EndGlobal

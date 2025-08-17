@@ -1,0 +1,25 @@
+<div class = "bg-[url('/images/LandingPage.svg')] bg-cover bg-center min-h-screen text-white p-10">
+    <div class="flex items-center justify-between mb-10">
+        <app-nav-bar></app-nav-bar>
+    </div>
+    <!-- Main Content -->
+    <div class="flex flex-col items-center justify-center flex-1">
+        
+    <!-- Audio Player -->
+    <audio *ngIf="audioUrl" [src]="audioUrl" controls class="w-[600px] rounded-full shadow-lg mb-8 bg-white"></audio>
+    
+    <!-- Placeholder for Avatar Animation-->
+     <div class="w-[600px] h-[400px] bg-gray-300 rounded-xl flex items-center justify-center mb-8">
+        <span class="text-gray-600 text-lg">Sign Language Avatar Placeholder</span>
+    </div>
+    
+    <!-- Download Button-->
+     <div class="w-[600px] flex justify-end">
+            <button
+                class="mt-0 rounded-full px-8 py-3 text-white font-semibold
+                        bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-100 transition w-fit">
+                Download
+            </button>
+        </div>
+  </div>
+</div>
