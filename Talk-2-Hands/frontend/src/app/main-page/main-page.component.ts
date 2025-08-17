@@ -43,21 +43,35 @@ export class MainPageComponent {
   }
 
   translate() {
-    // If a file was picked, it takes precedence
+    // If a file was picked, upload to backend
     if (this.selectedFile) {
-      const isVideo = this.selectedFile.type.startsWith('video/');
-      const route = isVideo ? '/video' : '/audio';
-      this.router.navigate([route]);
+      this.translateService.uploadFile(this.selectedFile).subscribe({
+        next: (res: any) => {
+          console.log('Backend file response:', res);
+
+          // Store so playback page can fetch it (and survive refresh)
+          sessionStorage.setItem('media', JSON.stringify(res));
+
+          const isVideo = this.selectedFile!.type.startsWith('video/');
+          const route = isVideo ? '/video' : '/audio';
+          this.router.navigate([route]);
+        },
+        error: (err) => console.error('Error uploading file:', err)
+      });
       return;
     }
 
-    // Else, if a link is provided, treat as video (YouTube link)
+    // If a link was pasted
     if (this.mediaLink.trim()) {
-      this.mediacontent.setLink(this.mediaLink.trim());
-      this.mediacontent.setFile(null);
-      // (Optional) validate YouTube URL
-      // if (!this.isYouTube(this.mediaLink.trim())) { ... show error ...; return; }
-      this.router.navigate(['/video']);
+      this.translateService.sendLink(this.mediaLink.trim()).subscribe({
+        next: (res: any) => {
+          console.log('Backend link response:', res);
+
+          sessionStorage.setItem('media', JSON.stringify(res));
+          this.router.navigate(['/video']); // treat link as video
+        },
+        error: (err) => console.error('Error sending link:', err)
+      });
       return;
     }
 

@@ -13,12 +13,15 @@ namespace Talk2Hands.Backend.Controllers
         }
 
         [HttpPost("upload")]
-        public IActionResult TranslateFromUpload(IFormFile file) 
+        [DisableRequestSizeLimit] 
+        [RequestSizeLimit(long.MaxValue)]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+        public IActionResult TranslateFromUpload([FromForm] IFormFile uploadedFile)
         {
-            if (file == null || file.Length == 0)
+            if (uploadedFile == null || uploadedFile.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            return Ok(new { message = $"Got file: {file.FileName}"});
+            return Ok(new { message = $"Got file: {uploadedFile.FileName}" });
         }
     }
 

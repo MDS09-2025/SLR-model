@@ -1,5 +1,7 @@
-var builder = WebApplication.CreateBuilder(args);
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
+var builder = WebApplication.CreateBuilder(args);
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -13,13 +15,35 @@ builder.Services.AddCors(options =>
         });
 });
 
+// For multipart forms (file uploads)
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = long.MaxValue;  // no limit on form upload
+});
+
+// For Kestrel server (global request limit)
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Limits.MaxRequestBodySize = long.MaxValue;
+});
+
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddControllers(); 
+// Controllers
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.Use((context, next) =>
+{
+    var maxBodySizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+    if (maxBodySizeFeature != null)
+        maxBodySizeFeature.MaxRequestBodySize = null;
+
+    return next();
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
