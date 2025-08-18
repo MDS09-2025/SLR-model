@@ -19,4 +19,8 @@ export class TranslateService {
     console.log('[TranslateService] FormData created with file:', file.name);
     return this.http.post(`${this.apiUrl}/upload`, formData);
   }
+
+  sendYoutube(url: string) {
+    return this.http.post(`${this.apiUrl}/youtube`, { url });
+  }
 }

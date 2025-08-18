@@ -42,7 +42,7 @@ export class VideoTranslationPageComponent {
 
       if (mediaData.type === 'video') {
         // backend object might be nested (backend.backend) or direct string
-        this.videoSrc = mediaData.backend.backend ?? mediaData.backend;
+        this.videoSrc = mediaData.backend;
         console.log('Playing video from backend:', this.videoSrc);
       } else {
         console.warn('Stored media is not video');

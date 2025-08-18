@@ -70,14 +70,16 @@ export class MainPageComponent {
 
     // If a link was pasted
     if (this.mediaLink.trim()) {
-      this.translateService.sendLink(this.mediaLink.trim()).subscribe({
+      this.translateService.sendYoutube(this.mediaLink.trim()).subscribe({
         next: (res: any) => {
-          console.log('Backend link response:', res);
+          console.log('Backend YouTube response:', res);
 
+          // Store whole response for player page
           sessionStorage.setItem('media', JSON.stringify(res));
-          this.router.navigate(['/video']); // treat link as video
+
+          this.router.navigate(['/video']); // always video for YT
         },
-        error: (err) => console.error('Error sending link:', err)
+        error: (err) => console.error('Error sending YouTube link:', err)
       });
       return;
     }
