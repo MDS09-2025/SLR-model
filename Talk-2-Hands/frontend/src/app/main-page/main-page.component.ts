@@ -47,14 +47,21 @@ export class MainPageComponent {
     if (this.selectedFile) {
       this.translateService.uploadFile(this.selectedFile).subscribe({
         next: (res: any) => {
-          console.log('Backend file response:', res);
+            console.log('Backend file response:', res);
 
-          // Store so playback page can fetch it (and survive refresh)
-          sessionStorage.setItem('media', JSON.stringify(res));
+          // Build object to store
+          const mediaData = {
+            backend: res, // whatever backend responded
+            type: this.selectedFile!.type.startsWith('video/') ? 'video' : 'audio',
+            fileName: this.selectedFile!.name
+          };
 
-          const isVideo = this.selectedFile!.type.startsWith('video/');
-          const route = isVideo ? '/video' : '/audio';
-          this.router.navigate([route]);
+            // Store so playback page can fetch it (and survive refresh)
+            sessionStorage.setItem('media', JSON.stringify(mediaData));
+
+            const isVideo = this.selectedFile!.type.startsWith('video/');
+            const route = isVideo ? '/video' : '/audio';
+            this.router.navigate([route]);
         },
         error: (err) => console.error('Error uploading file:', err)
       });

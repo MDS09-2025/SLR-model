@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +46,25 @@ app.Use((context, next) =>
 
     return next();
 });
+
+// Serve everything in wwwroot
+app.UseStaticFiles();
+
+// Serve specifically /uploads
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "uploads")),
+    RequestPath = "/uploads",
+    ServeUnknownFileTypes = true,
+    DefaultContentType = "application/octet-stream",
+    ContentTypeProvider = new FileExtensionContentTypeProvider(
+        new Dictionary<string, string>
+        {
+            { ".flac", "audio/flac" }
+        })
+});
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

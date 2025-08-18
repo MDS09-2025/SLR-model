@@ -12,9 +12,11 @@ export class TranslateService {
   }
 
   uploadFile(file: File) {
+    console.log('[TranslateService] Uploading file:', file);
     const formData = new FormData();
     formData.append('uploadedFile', file, file.name); // must match backend param name
 
+    console.log('[TranslateService] FormData created with file:', file.name);
     return this.http.post(`${this.apiUrl}/upload`, formData);
   }
 }

@@ -18,12 +18,27 @@ export class AudioTranslationPageComponent implements OnInit{
   // Injecting the MediaTransferService to access the selected media file
 
   ngOnInit(): void {
-    const file = this.mediacontent.getFile();
-    if (file) {
-      console.log('Selected file in AudioTranslationPage:', file);
-      this.audioUrl = URL.createObjectURL(file);
-      // Create a URL for the audio file to be played
+    console.log('[AudioTranslationPage] ngOnInit called');
+    const stored = sessionStorage.getItem('media');
+    console.log('[AudioTranslationPage] Stored media:', stored);
+    if (stored) {
+      const mediaData = JSON.parse(stored);
+      console.log('[AudioTranslationPage] Parsed mediaData:', mediaData);
+      if (mediaData.type === 'audio') {
+        this.audioUrl = mediaData.backend.backend; // Use the backend URL for audio
+        console.log('Playing audio from backend:', this.audioUrl);
+      } else {
+        console.warn('Stored media is not audio');
+      }
+    } else {
+      console.warn('No media found in session storage');
     }
+    // const file = this.mediacontent.getFile();
+    // if (file) {
+    //   console.log('Selected file in AudioTranslationPage:', file);
+    //   this.audioUrl = URL.createObjectURL(file);
+    //   // Create a URL for the audio file to be played
+    // }
   }
 
 }

@@ -6,6 +6,13 @@ namespace Talk2Hands.Backend.Controllers
     [Route("api/[controller]")]
     public class TranslateController : ControllerBase
     {
+        private readonly IWebHostEnvironment _env;
+
+        public TranslateController(IWebHostEnvironment env)
+        {
+            _env = env;
+        }
+
         [HttpPost("link")]
         public IActionResult TranslateFromLink([FromBody] LinkRequest request)
         {
@@ -21,12 +28,29 @@ namespace Talk2Hands.Backend.Controllers
             if (uploadedFile == null || uploadedFile.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            return Ok(new { message = $"Got file: {uploadedFile.FileName}" });
+            var uploadsPath = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads");
+            if (!Directory.Exists(uploadsPath))
+                Directory.CreateDirectory(uploadsPath);
+
+            var filePath = Path.Combine(uploadsPath, uploadedFile.FileName);
+            Console.WriteLine("Saving file to: " + filePath);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                uploadedFile.CopyTo(stream);
+            }
+
+            var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uploadedFile.FileName}";
+
+            return Ok(new { 
+                message = "File uploaded successfully",
+                type = uploadedFile.ContentType.StartsWith("video") ? "video" : "audio",
+                backend = fileUrl
+            });
         }
     }
 
     public class LinkRequest
     {
-        public string Url { get; set; }
+        public string Url { get; set; } = string.Empty;
     }
 }
