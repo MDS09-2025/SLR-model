@@ -8,7 +8,7 @@
     <!-- Audio Player -->
     <div class="w-[600px] mb-8">
         <ng-container *ngIf="audioUrl; else noAudio">
-            <audio [src]="audioUrl" controls autoplay
+            <audio [src]="audioUrl" controls 
                 class="w-full rounded-full shadow-lg bg-white">
                 <source [src]="audioUrl" type="audio/flac" />
             </audio>

@@ -61,7 +61,10 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = new FileExtensionContentTypeProvider(
         new Dictionary<string, string>
         {
-            { ".flac", "audio/flac" }
+            { ".flac", "audio/flac" },
+            { ".mp4", "video/mp4" },
+            { ".webm", "video/webm" },
+            { ".mov", "video/quicktime" }
         })
 });
 

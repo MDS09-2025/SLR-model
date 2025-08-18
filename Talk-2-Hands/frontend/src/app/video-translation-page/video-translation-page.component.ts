@@ -17,18 +17,38 @@ export class VideoTranslationPageComponent {
   
   constructor(private mediaService: MediaTransferService){}
 
-  ngOnInit(): void {
-    const file = this.mediaService.getFile();
-    const link = this.mediaService.getLink();
+  // ngOnInit(): void {
+  //   const file = this.mediaService.getFile();
+  //   const link = this.mediaService.getLink();
 
-    // If video file is uploaded
-    if (file) {
-      this.localFile = file;
-      console.log('Playing video file:', file);
-      this.videoSrc = URL.createObjectURL(file);
-    } else if (link) {
-      console.log('Playing video link:', link);
-      this.videoSrc = link;
+  //   // If video file is uploaded
+  //   if (file) {
+  //     this.localFile = file;
+  //     console.log('Playing video file:', file);
+  //     this.videoSrc = URL.createObjectURL(file);
+  //   } else if (link) {
+  //     console.log('Playing video link:', link);
+  //     this.videoSrc = link;
+  //   }
+  // }
+  ngOnInit(): void {
+    console.log('[VideoTranslationPage] ngOnInit called');
+    const stored = sessionStorage.getItem('media');
+    console.log('[VideoTranslationPage] Stored media:', stored);
+
+    if (stored) {
+      const mediaData = JSON.parse(stored);
+      console.log('[VideoTranslationPage] Parsed mediaData:', mediaData);
+
+      if (mediaData.type === 'video') {
+        // backend object might be nested (backend.backend) or direct string
+        this.videoSrc = mediaData.backend.backend ?? mediaData.backend;
+        console.log('Playing video from backend:', this.videoSrc);
+      } else {
+        console.warn('Stored media is not video');
+      }
+    } else {
+      console.warn('No media found in session storage');
     }
   }
 
