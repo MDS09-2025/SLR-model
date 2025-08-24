@@ -81,6 +81,24 @@ app.UseStaticFiles(new StaticFileOptions
         })
 });
 
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "jobs")),
+    RequestPath = "/jobs",
+    ServeUnknownFileTypes = true,
+    DefaultContentType = "application/octet-stream",
+    ContentTypeProvider = new FileExtensionContentTypeProvider(
+        new Dictionary<string, string>
+        {
+            { ".flac", "audio/flac" },
+            { ".wav", "audio/wav" },
+            { ".mp4", "video/mp4" },
+            { ".webm", "video/webm" },
+            { ".mov", "video/quicktime" },
+            { ".txt", "text/plain" }
+        })
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

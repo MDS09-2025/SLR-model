@@ -35,61 +35,29 @@ namespace Talk2Hands.Backend.Controllers
             if (uploadedFile is null || uploadedFile.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            // // 1) Save to wwwroot/uploads for immediate playback in Angular
-            // var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            // var jobsRoot = Path.Combine(webRoot, "uploads");
-            // Directory.CreateDirectory(uploadsRoot);
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var jobsRoot = Path.Combine(webRoot, "jobs");
+            Directory.CreateDirectory(jobsRoot);
 
-            // var safeName = Path.GetFileName(uploadedFile.FileName);
-            // var publicDiskPath = Path.Combine(uploadsRoot, safeName);
-            // await using (var fs = System.IO.File.Create(publicDiskPath))
-            //     await uploadedFile.CopyToAsync(fs);
+            var jobId = Guid.NewGuid().ToString("N");
+            var jobWork = Path.Combine(jobsRoot, jobId);
+            Directory.CreateDirectory(jobWork);
 
-            // // 2) Create job working dir in wwwroot/jobs/{jobId}
-            // var jobsRoot = Path.Combine(webRoot, "jobs");
-            // Directory.CreateDirectory(jobsRoot);
-            // var jobId = Guid.NewGuid().ToString("N");
-            // var jobWork = Path.Combine(jobsRoot, jobId);
-            // Directory.CreateDirectory(jobWork);
+            var safeName = Path.GetFileName(uploadedFile.FileName);
+            var originalPath = Path.Combine(jobWork, safeName);
 
-            // // 3) Put the file (or audio-extracted wav if it's a video) into Raw_Audio
-            // var rawDir = Path.Combine(jobWork, "Raw_Audio");
-            // Directory.CreateDirectory(rawDir);
+            // 2) Save original upload into job folder
+            await using (var fs = System.IO.File.Create(originalPath))
+                await uploadedFile.CopyToAsync(fs);
 
-            // var ext = Path.GetExtension(safeName).ToLowerInvariant();
-            // var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
-             // 1) Create job working dir in wwwroot/jobs/{jobId}
-    var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-    var jobsRoot = Path.Combine(webRoot, "jobs");
-    Directory.CreateDirectory(jobsRoot);
+            // 3) Prepare Raw_Audio folder
+            var rawDir = Path.Combine(jobWork, "Raw_Audio");
+            Directory.CreateDirectory(rawDir);
 
-    var jobId = Guid.NewGuid().ToString("N");
-    var jobWork = Path.Combine(jobsRoot, jobId);
-    Directory.CreateDirectory(jobWork);
-
-    var safeName = Path.GetFileName(uploadedFile.FileName);
-    var originalPath = Path.Combine(jobWork, safeName);
-
-    // 2) Save original upload into job folder
-    await using (var fs = System.IO.File.Create(originalPath))
-        await uploadedFile.CopyToAsync(fs);
-
-    // 3) Prepare Raw_Audio folder
-    var rawDir = Path.Combine(jobWork, "Raw_Audio");
-    Directory.CreateDirectory(rawDir);
-
-    var ext = Path.GetExtension(safeName).ToLowerInvariant();
-    var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
+            var ext = Path.GetExtension(safeName).ToLowerInvariant();
+            var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
             if (isVideo)
             {
-                // // Save original video in job folder (so frontend can play it later)
-                // var videoCopy = Path.Combine(jobWork, safeName);
-                // System.IO.File.Copy(publicDiskPath, videoCopy, overwrite: true);
-
-                // var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
-                // await RunFfmpeg(publicDiskPath, wavOut);
-
-                // Extract audio track for pipeline
                 var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
                 await RunFfmpeg(originalPath, wavOut);
             }
@@ -113,9 +81,6 @@ namespace Talk2Hands.Backend.Controllers
             //    You store { backend: res, type, fileName } so res must have "backend" string
             return Ok(new
             {
-                // backend = isVideo ? $"/jobs/{jobId}/{safeName}" : $"/uploads/{safeName}",
-                // jobId = job.JobId,
-                // statusUrl = $"/api/translate/status/{job.JobId}"
                 backend = $"{job.PublicBase}/{safeName}", // ✅ always under jobs
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"
@@ -124,7 +89,6 @@ namespace Talk2Hands.Backend.Controllers
 
         public sealed record YoutubeReq(string Url);
 
-        // POST /api/translate/youtube
         [HttpPost("youtube")]
         public async Task<IActionResult> Youtube([FromBody] YoutubeReq body)
         {
@@ -138,13 +102,43 @@ namespace Talk2Hands.Backend.Controllers
             var jobWork = Path.Combine(jobsRoot, jobId);
             Directory.CreateDirectory(jobWork);
 
-            await System.IO.File.WriteAllTextAsync(
-                Path.Combine(jobWork, "Youtube_urls.txt"),
-                body.Url.Trim() + Environment.NewLine
-            );
+            // Step 1: pick a predictable safe filename
+            var safeName = $"youtube_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.mp4";
+            var videoPath = Path.Combine(jobWork, safeName);
 
-            var job = new PipelineJob
-            {
+            // Step 2: run yt-dlp with that as output target
+            var psi = new ProcessStartInfo {
+                FileName = "yt-dlp",
+                ArgumentList = {
+                    "-f", "bv+ba/best",                 // best video + best audio
+                    "--merge-output-format", "mp4",     // always mp4
+                    "-o", videoPath,                    // output path
+                    body.Url
+                },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+
+            var proc = Process.Start(psi)!;
+            string stderr = await proc.StandardError.ReadToEndAsync();
+            string stdout = await proc.StandardOutput.ReadToEndAsync();
+            await proc.WaitForExitAsync();
+
+            if (proc.ExitCode != 0 || !System.IO.File.Exists(videoPath))
+                throw new Exception($"yt-dlp failed. stderr={stderr}");
+
+            Console.WriteLine($"[YouTube] Downloaded {videoPath}, length={new FileInfo(videoPath).Length} bytes");
+
+            // Step 3: extract audio into Raw_Audio
+            var rawDir = Path.Combine(jobWork, "Raw_Audio");
+            Directory.CreateDirectory(rawDir);
+            var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
+
+            await RunFfmpeg(videoPath, wavOut);
+
+            // Step 4: register + enqueue pipeline job
+            var job = new PipelineJob {
                 SourceType = "youtube",
                 WorkDir = jobWork,
                 PublicBase = $"/jobs/{jobId}"
@@ -152,15 +146,16 @@ namespace Talk2Hands.Backend.Controllers
             _store.Add(job);
             await _queue.EnqueueAsync(job);
 
-            // Again, match your Angular shape: res.backend exists (you navigate to /video)
-            // You can let your video player use the YT URL while the pipeline runs.
-            return Ok(new
-            {
-                backend = body.Url,                 // <—— YT URL for immediate playback
+            // Step 5: return response Angular expects
+            return Ok(new {
+                type = "video",
+                backend = $"{job.PublicBase}/{safeName}",
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"
             });
         }
+
+
 
         // GET /api/translate/status/{jobId}
         [HttpGet("status/{jobId}")]
@@ -195,8 +190,10 @@ namespace Talk2Hands.Backend.Controllers
                 UseShellExecute = false
             };
             using var p = System.Diagnostics.Process.Start(psi)!;
+            var stderr = await p.StandardError.ReadToEndAsync();
             await p.WaitForExitAsync();
-            if (p.ExitCode != 0) throw new Exception("ffmpeg failed");
+            if (p.ExitCode != 0)
+                throw new Exception($"ffmpeg failed: {stderr}");
         }
     }
 }

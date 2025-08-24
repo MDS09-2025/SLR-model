@@ -37,12 +37,6 @@ export class AudioTranslationPageComponent implements OnInit{
     } else {
       console.warn('No media found in session storage');
     }
-    // const file = this.mediacontent.getFile();
-    // if (file) {
-    //   console.log('Selected file in AudioTranslationPage:', file);
-    //   this.audioUrl = URL.createObjectURL(file);
-    //   // Create a URL for the audio file to be played
-    // }
   }
 
 }

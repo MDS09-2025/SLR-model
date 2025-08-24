@@ -112,20 +112,53 @@ export class MainPageComponent {
       return;
     }
 
-    // If a link was pasted
     if (this.mediaLink.trim()) {
       this.translateService.sendYoutube(this.mediaLink.trim()).subscribe({
         next: (res: any) => {
           console.log('Backend YouTube response:', res);
 
-          // Store whole response for player page
-          sessionStorage.setItem('media', JSON.stringify(res));
-          this.router.navigate(['/video']); // always video for YT
+          const mediaData = {
+            ...res, 
+            type: 'video' // ensure it's flagged as video
+          };
+          sessionStorage.setItem('media', JSON.stringify(mediaData));
+
+          const jobId = res.jobId;
+
+          timer(0, 2000).pipe(
+            switchMap(() => this.translateService.getStatus(jobId)),
+            takeUntil(
+              timer(0, 2000).pipe(
+                switchMap(() => this.translateService.getStatus(jobId)),
+                filter((j: any) => j.status === 3), // failed
+                take(1)
+              )
+            ),
+            filter((j: any) => j.status === 2),
+            take(1),
+            switchMap(() =>
+              forkJoin({
+                transcript: this.translateService.getResult(jobId, 'transcript').pipe(catchError(() => EMPTY)),
+                gloss:      this.translateService.getResult(jobId, 'gloss').pipe(catchError(() => EMPTY)),
+              })
+            )
+          ).subscribe({
+            next: (results) => {
+              const withResults = { ...mediaData, results };
+              sessionStorage.setItem('media', JSON.stringify(withResults));
+              this.router.navigate(['/video']);
+            },
+            error: (e) => {
+              console.error('Polling failed', e);
+              this.router.navigate(['/video']);
+            }
+          });
         },
         error: (err) => console.error('Error sending YouTube link:', err)
       });
       return;
     }
+
 
     // Nothing provided
     console.warn('Please paste a link or upload a file.');
