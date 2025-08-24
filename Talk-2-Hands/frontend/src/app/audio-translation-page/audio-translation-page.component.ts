@@ -14,6 +14,9 @@ export class AudioTranslationPageComponent implements OnInit{
   audioUrl: string | null = null;
   // This will hold the URL of the audio file to be played
 
+  // Temporary display gloss
+  gloss: string | null = null;
+
   constructor(private mediacontent: MediaTransferService) { }
   // Injecting the MediaTransferService to access the selected media file
 
@@ -25,8 +28,9 @@ export class AudioTranslationPageComponent implements OnInit{
       const mediaData = JSON.parse(stored);
       console.log('[AudioTranslationPage] Parsed mediaData:', mediaData);
       if (mediaData.type === 'audio') {
-        this.audioUrl = mediaData.backend.backend; // Use the backend URL for audio
+        this.audioUrl = 'http://localhost:5027' + mediaData.backend;// Use the backend URL for audio
         console.log('Playing audio from backend:', this.audioUrl);
+        this.gloss = mediaData.results?.gloss ?? null;
       } else {
         console.warn('Stored media is not audio');
       }

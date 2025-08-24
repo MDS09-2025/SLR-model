@@ -5,6 +5,9 @@ import { TranslateService } from '../services/translate.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common'; 
 import { MediaTransferService } from '../services/media-transfer.service';
+import { HttpEventType, HttpResponse } from '@angular/common/http';
+import { timer, EMPTY, forkJoin } from 'rxjs';
+import { switchMap, filter, takeUntil, take, map, catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-main-page',
@@ -42,26 +45,67 @@ export class MainPageComponent {
     this.mediacontent.setLink(null); // prefer file if both present
   }
 
-  translate() {
+ translate() {
     // If a file was picked, upload to backend
     if (this.selectedFile) {
       this.translateService.uploadFile(this.selectedFile).subscribe({
-        next: (res: any) => {
-            console.log('Backend file response:', res);
+        next: (event: any) => {
+          if (event.type === HttpEventType.UploadProgress) {
+            const percent = Math.round(100 * event.loaded / event.total);
+            console.log(`Upload progress: ${percent}%`);
+          } else if (event instanceof HttpResponse) {
+            // Final backend response
+            console.log('Final backend response:', event.body);
 
-          // Build object to store
-          const mediaData = {
-            backend: res, // whatever backend responded
-            type: this.selectedFile!.type.startsWith('video/') ? 'video' : 'audio',
-            fileName: this.selectedFile!.name
-          };
+            const res = event.body;
+            const mediaData = {
+              backend: res.backend,   // "/uploads/file.flac" for playback
+              jobId: res.jobId,       // store this so you can poll status
+              statusUrl: res.statusUrl,
+              type: this.selectedFile!.type.startsWith('video/') ? 'video' : 'audio',
+              fileName: this.selectedFile!.name
+            };
 
-            // Store so playback page can fetch it (and survive refresh)
             sessionStorage.setItem('media', JSON.stringify(mediaData));
 
-            const isVideo = this.selectedFile!.type.startsWith('video/');
-            const route = isVideo ? '/video' : '/audio';
-            this.router.navigate([route]);
+            // ---- Poll until Finished (or Failed) BEFORE navigating ----
+            const jobId = res.jobId;
+
+            timer(0, 2000).pipe(
+              switchMap(() => this.translateService.getStatus(jobId)),
+              // stop polling if failed
+              takeUntil(
+                timer(0, 2000).pipe(
+                  switchMap(() => this.translateService.getStatus(jobId)),
+                  filter((j: any) => j.status === 3),
+                  take(1)
+                )
+              ),
+              filter((j: any) => j.status === 2),
+              take(1),
+              switchMap(() =>
+                forkJoin({
+                  transcript: this.translateService.getResult(jobId, 'transcript').pipe(catchError(() => EMPTY)),
+                  gloss:       this.translateService.getResult(jobId, 'gloss').pipe(catchError(() => EMPTY)),
+                })
+              )
+            ).subscribe({
+              next: (results) => {
+                // stash results so audio page can show them
+                const withResults = { ...mediaData, results };
+                sessionStorage.setItem('media', JSON.stringify(withResults));
+
+                const isVideo = this.selectedFile!.type.startsWith('video/');
+                this.router.navigate([isVideo ? '/video' : '/audio']);
+              },
+              error: (e) => {
+                console.error('Polling failed', e);
+                // navigate anyway, audio page can show an error/“failed” state
+                const isVideo = this.selectedFile!.type.startsWith('video/');
+                this.router.navigate([isVideo ? '/video' : '/audio']);
+              }
+            });
+          }
         },
         error: (err) => console.error('Error uploading file:', err)
       });
@@ -76,7 +120,6 @@ export class MainPageComponent {
 
           // Store whole response for player page
           sessionStorage.setItem('media', JSON.stringify(res));
-
           this.router.navigate(['/video']); // always video for YT
         },
         error: (err) => console.error('Error sending YouTube link:', err)
