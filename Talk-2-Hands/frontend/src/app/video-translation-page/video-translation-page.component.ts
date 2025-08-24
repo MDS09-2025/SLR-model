@@ -12,25 +12,13 @@ import { MediaTransferService } from '../services/media-transfer.service';
 export class VideoTranslationPageComponent {
   videoSrc: string | null = null;
   localFile?: File;
+  // Temporary display gloss
+  gloss: string | null = null;
 
   @ViewChild('player') playerRef?: ElementRef<HTMLVideoElement>;  // ✅ reference to <video>
   
   constructor(private mediaService: MediaTransferService){}
 
-  // ngOnInit(): void {
-  //   const file = this.mediaService.getFile();
-  //   const link = this.mediaService.getLink();
-
-  //   // If video file is uploaded
-  //   if (file) {
-  //     this.localFile = file;
-  //     console.log('Playing video file:', file);
-  //     this.videoSrc = URL.createObjectURL(file);
-  //   } else if (link) {
-  //     console.log('Playing video link:', link);
-  //     this.videoSrc = link;
-  //   }
-  // }
   ngOnInit(): void {
     console.log('[VideoTranslationPage] ngOnInit called');
     const stored = sessionStorage.getItem('media');
@@ -41,8 +29,8 @@ export class VideoTranslationPageComponent {
       console.log('[VideoTranslationPage] Parsed mediaData:', mediaData);
 
       if (mediaData.type === 'video') {
-        // backend object might be nested (backend.backend) or direct string
-        this.videoSrc = mediaData.backend;
+        this.videoSrc = `http://localhost:5027${mediaData.backend}`;
+        this.gloss = mediaData.results?.gloss ?? null;
         console.log('Playing video from backend:', this.videoSrc);
       } else {
         console.warn('Stored media is not video');

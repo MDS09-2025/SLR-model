@@ -12,15 +12,24 @@ export class TranslateService {
   }
 
   uploadFile(file: File) {
-    console.log('[TranslateService] Uploading file:', file);
     const formData = new FormData();
-    formData.append('uploadedFile', file, file.name); // must match backend param name
-
-    console.log('[TranslateService] FormData created with file:', file.name);
-    return this.http.post(`${this.apiUrl}/upload`, formData);
+    formData.append('uploadedFile', file, file.name);
+    
+    return this.http.post(`${this.apiUrl}/upload`, formData, {
+      reportProgress: true,
+      observe: 'events'
+    });
   }
 
   sendYoutube(url: string) {
     return this.http.post(`${this.apiUrl}/youtube`, { url });
+  }
+
+  getStatus(jobId: string) {
+    return this.http.get(`${this.apiUrl}/status/${jobId}`);
+  }
+
+  getResult(jobId: string, which: 'transcript' | 'gloss') {
+    return this.http.get(`${this.apiUrl}/result/${jobId}/${which}`, { responseType: 'text' });
   }
 }

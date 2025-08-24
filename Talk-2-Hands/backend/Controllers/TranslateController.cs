@@ -35,37 +35,68 @@ namespace Talk2Hands.Backend.Controllers
             if (uploadedFile is null || uploadedFile.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            // 1) Save to wwwroot/uploads for immediate playback in Angular
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var uploadsRoot = Path.Combine(webRoot, "uploads");
-            Directory.CreateDirectory(uploadsRoot);
+            // // 1) Save to wwwroot/uploads for immediate playback in Angular
+            // var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            // var jobsRoot = Path.Combine(webRoot, "uploads");
+            // Directory.CreateDirectory(uploadsRoot);
 
-            var safeName = Path.GetFileName(uploadedFile.FileName);
-            var publicDiskPath = Path.Combine(uploadsRoot, safeName);
-            await using (var fs = System.IO.File.Create(publicDiskPath))
-                await uploadedFile.CopyToAsync(fs);
+            // var safeName = Path.GetFileName(uploadedFile.FileName);
+            // var publicDiskPath = Path.Combine(uploadsRoot, safeName);
+            // await using (var fs = System.IO.File.Create(publicDiskPath))
+            //     await uploadedFile.CopyToAsync(fs);
 
-            // 2) Create job working dir in wwwroot/jobs/{jobId}
-            var jobsRoot = Path.Combine(webRoot, "jobs");
-            Directory.CreateDirectory(jobsRoot);
-            var jobId = Guid.NewGuid().ToString("N");
-            var jobWork = Path.Combine(jobsRoot, jobId);
-            Directory.CreateDirectory(jobWork);
+            // // 2) Create job working dir in wwwroot/jobs/{jobId}
+            // var jobsRoot = Path.Combine(webRoot, "jobs");
+            // Directory.CreateDirectory(jobsRoot);
+            // var jobId = Guid.NewGuid().ToString("N");
+            // var jobWork = Path.Combine(jobsRoot, jobId);
+            // Directory.CreateDirectory(jobWork);
 
-            // 3) Put the file (or audio-extracted wav if it's a video) into Raw_Audio
-            var rawDir = Path.Combine(jobWork, "Raw_Audio");
-            Directory.CreateDirectory(rawDir);
+            // // 3) Put the file (or audio-extracted wav if it's a video) into Raw_Audio
+            // var rawDir = Path.Combine(jobWork, "Raw_Audio");
+            // Directory.CreateDirectory(rawDir);
 
-            var ext = Path.GetExtension(safeName).ToLowerInvariant();
-            var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
+            // var ext = Path.GetExtension(safeName).ToLowerInvariant();
+            // var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
+             // 1) Create job working dir in wwwroot/jobs/{jobId}
+    var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+    var jobsRoot = Path.Combine(webRoot, "jobs");
+    Directory.CreateDirectory(jobsRoot);
+
+    var jobId = Guid.NewGuid().ToString("N");
+    var jobWork = Path.Combine(jobsRoot, jobId);
+    Directory.CreateDirectory(jobWork);
+
+    var safeName = Path.GetFileName(uploadedFile.FileName);
+    var originalPath = Path.Combine(jobWork, safeName);
+
+    // 2) Save original upload into job folder
+    await using (var fs = System.IO.File.Create(originalPath))
+        await uploadedFile.CopyToAsync(fs);
+
+    // 3) Prepare Raw_Audio folder
+    var rawDir = Path.Combine(jobWork, "Raw_Audio");
+    Directory.CreateDirectory(rawDir);
+
+    var ext = Path.GetExtension(safeName).ToLowerInvariant();
+    var isVideo = Regex.IsMatch(ext, @"\.(mp4|mov|mkv|avi|webm)$");
             if (isVideo)
             {
+                // // Save original video in job folder (so frontend can play it later)
+                // var videoCopy = Path.Combine(jobWork, safeName);
+                // System.IO.File.Copy(publicDiskPath, videoCopy, overwrite: true);
+
+                // var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
+                // await RunFfmpeg(publicDiskPath, wavOut);
+
+                // Extract audio track for pipeline
                 var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
-                await RunFfmpeg(publicDiskPath, wavOut);
+                await RunFfmpeg(originalPath, wavOut);
             }
             else
             {
-                System.IO.File.Copy(publicDiskPath, Path.Combine(rawDir, safeName), overwrite: true);
+                // System.IO.File.Copy(publicDiskPath, Path.Combine(rawDir, safeName), overwrite: true);
+                System.IO.File.Copy(originalPath, Path.Combine(rawDir, safeName), overwrite: true);
             }
 
             // 4) Register + enqueue job
@@ -82,7 +113,10 @@ namespace Talk2Hands.Backend.Controllers
             //    You store { backend: res, type, fileName } so res must have "backend" string
             return Ok(new
             {
-                backend = $"/uploads/{safeName}",   // <—— Angular plays this immediately
+                // backend = isVideo ? $"/jobs/{jobId}/{safeName}" : $"/uploads/{safeName}",
+                // jobId = job.JobId,
+                // statusUrl = $"/api/translate/status/{job.JobId}"
+                backend = $"{job.PublicBase}/{safeName}", // ✅ always under jobs
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"
             });
