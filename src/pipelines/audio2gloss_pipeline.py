@@ -285,8 +285,8 @@ def translate_file(t2g_model, device, tw2i, gw2i, gi2w, in_txt, out_txt,
                                 beam_size=beam_size, len_penalty=len_penalty)
         else:
             gloss = decode_greedy(t2g_model, src, device, tw2i, gw2i, gi2w, max_len=max_len)
-        results.append(f"{ln}  -->  {gloss}")
-        print(results[-1])
+        results.append(gloss)   # only keep gloss
+        print(gloss)
     with open(out_txt, "w") as f:
         f.write("\n".join(results))
     print(f"Gloss saved to {os.path.abspath(out_txt)}")
