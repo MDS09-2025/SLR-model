@@ -7,7 +7,6 @@ Steps
 2) Transcribe each audio file with Faster-Whisper
 3) Translate transcribed text to gloss with your TransformerModel
 
-Author: you :)
 """
 
 import os, sys, json, argparse, re, math
@@ -22,7 +21,13 @@ import noisereduce
 import yt_dlp
 
 import torch
-from src.training.t2g_model import TransformerModel
+import sys, os
+
+# Add .../SLR-model/src to Python path
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+sys.path.insert(0, SRC_PATH)
+
+from training.t2g_model import TransformerModel
 from faster_whisper import WhisperModel
 
 def ensure_empty_dir(path: str):
@@ -122,7 +127,7 @@ def preprocess_audio(input_dir="Raw_Audio", output_dir="Clean_Audio",
 
 
 def transcribe_dir_grouped(audio_dir, out_dir, model_size="medium",
-                           asr_device="cpu", compute_type="float32", beam_size=5):
+                           asr_device="cpu", compute_type="float32", beam_size=5, merged_out=None):
     os.makedirs(out_dir, exist_ok=True)
 
     model = WhisperModel(model_size, device=str(asr_device), compute_type=compute_type)
@@ -153,6 +158,19 @@ def transcribe_dir_grouped(audio_dir, out_dir, model_size="medium",
         with open(out_path, "w") as f:
             f.write("\n".join(all_text))
         print(f"Saved transcript to {out_path}")
+     # ----------------------------
+    # Merge all transcripts into one
+    # ----------------------------
+    if merged_out is not None:
+        with open(merged_out, "w") as fout:
+            for base in sorted(groups.keys()):
+                per_file = os.path.join(out_dir, f"{base}.txt")
+                if os.path.exists(per_file):
+                    with open(per_file, "r") as fin:
+                        text = fin.read().strip()
+                        if text:
+                            fout.write(text + "\n")
+        print(f"Merged transcript saved to {merged_out}")
 
 # ---------------------------
 # 3) Text → Gloss
@@ -355,7 +373,8 @@ def main():
             # pass the new decoder flags
             decoder=args.t2g_decoder,
             beam_size=args.t2g_beam,
-            len_penalty=args.t2g_lenpen
+            len_penalty=args.t2g_lenpen,
+            merged_out=args.transcript_txt 
         )
 
 if __name__ == "__main__":

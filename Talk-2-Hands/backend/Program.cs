@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.StaticFiles;
+using Talk2Hands.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +37,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+
+// ✅ Register your DI services
+builder.Services.AddSingleton<IPipelineStore, PipelineStore>();
+builder.Services.AddSingleton<IPipelineQueue, PipelineQueue>();
+builder.Services.AddHostedService<PipelineWorker>();
+
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
+));
+
 var app = builder.Build();
 
 app.Use((context, next) =>
@@ -46,6 +57,8 @@ app.Use((context, next) =>
 
     return next();
 });
+
+app.UseCors();
 
 // Serve everything in wwwroot
 app.UseStaticFiles();

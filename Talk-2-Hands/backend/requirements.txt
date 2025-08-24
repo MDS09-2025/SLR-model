@@ -1,0 +1,7 @@
+numpy
+torch
+faster-whisper
+librosa
+soundfile
+noisereduce
+yt-dlp
