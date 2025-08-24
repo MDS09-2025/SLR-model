@@ -291,6 +291,18 @@ def translate_file(t2g_model, device, tw2i, gw2i, gi2w, in_txt, out_txt,
         f.write("\n".join(results))
     print(f"Gloss saved to {os.path.abspath(out_txt)}")
 
+def merge_transcripts(out_dir: str, merged_out: str):
+    os.makedirs(os.path.dirname(merged_out) or ".", exist_ok=True)
+    txts = [f for f in os.listdir(out_dir) if f.lower().endswith(".txt")]
+    txts.sort()  # deterministic order
+    with open(merged_out, "w") as fout:
+        for f in txts:
+            p = os.path.join(out_dir, f)
+            with open(p, "r") as fin:
+                text = fin.read().strip()
+                if text:
+                    fout.write(text + "\n")
+    print(f"Merged transcript saved to {os.path.abspath(merged_out)}")
 # ---------------------------
 # CLI
 # ---------------------------
@@ -357,7 +369,8 @@ def main():
             model_size=args.whisper_size,
             asr_device=args.asr_device,
             compute_type=args.compute_type,
-            beam_size=args.beam_size
+            beam_size=args.beam_size,
+            merged_out=args.transcript_txt
     )
 
     # Step 3: translate (optional)
@@ -373,8 +386,7 @@ def main():
             # pass the new decoder flags
             decoder=args.t2g_decoder,
             beam_size=args.t2g_beam,
-            len_penalty=args.t2g_lenpen,
-            merged_out=args.transcript_txt 
+            len_penalty=args.t2g_lenpen
         )
 
 if __name__ == "__main__":

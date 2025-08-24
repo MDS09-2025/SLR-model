@@ -77,7 +77,8 @@ public class PipelineWorker : BackgroundService {
                     "--max_src_len","64","--max_len","100",
                     "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
                     "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
-                    "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt")
+                    "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
+                    "--t2g_cpu"
                 );
 
                 job.Status = JobState.Finished;
