@@ -19,13 +19,18 @@
     </div> 
     <!-- add 3d character posing -->
     <!-- 3D rendering logic (later)-->
-    
+    <div *ngIf="gloss"
+        class="absolute bottom-6 w-full text-center">
+        <span class="bg-black bg-opacity-60 text-white px-4 py-2 rounded-lg text-lg">
+        {{ gloss }}
+        </span>
+    </div>
     <div class="mt-4 flex items-center justify-between gap-3">
       <div class="flex gap-3">
         <!-- Download -->
         <button
           class="rounded-full px-6 py-3 bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90"
-          (click)="download()">
+          (click)="downloadVideo()">
           Download
         </button>
         <!-- Full screen -->
@@ -35,11 +40,6 @@
           Full Screen
         </button>
       </div>
-    </div>
-
-     <div *ngIf="gloss" style="margin-top:1rem">
-        <h3>Gloss</h3>
-        <pre>{{ gloss }}</pre>
     </div>
   </main>
 </div>

@@ -60,26 +60,46 @@ public class PipelineWorker : BackgroundService {
 
                 // 3) translate
                 job.Steps.Add("translate"); Save(job);
-                var modelPath  = ResolvePath(_cfg["Pipeline:T2GModel"]  ?? "../../transformer_model.pt");
-                Console.WriteLine($"[DEBUG] _cfg[T2GModel]: {_cfg["Pipeline:T2GModel"]}");
-                var configPath = ResolvePath(_cfg["Pipeline:T2GConfig"] ?? "../../transformer_model_config.json");
-                var vocabPath  = ResolvePath(_cfg["Pipeline:T2GVocab"]  ?? "../../transformer_vocab.json");
+                // var modelPath  = ResolvePath(_cfg["Pipeline:T2GModel"]  ?? "../../transformer_model.pt");
+                // Console.WriteLine($"[DEBUG] _cfg[T2GModel]: {_cfg["Pipeline:T2GModel"]}");
+                // var configPath = ResolvePath(_cfg["Pipeline:T2GConfig"] ?? "../../transformer_model_config.json");
+                // var vocabPath  = ResolvePath(_cfg["Pipeline:T2GVocab"]  ?? "../../transformer_vocab.json");
 
-                if (!File.Exists(modelPath))  throw new FileNotFoundException($"Missing T2G model at {modelPath}");
-                if (!File.Exists(configPath)) throw new FileNotFoundException($"Missing T2G config at {configPath}");
-                if (!File.Exists(vocabPath))  throw new FileNotFoundException($"Missing T2G vocab at {vocabPath}");
+                // if (!File.Exists(modelPath))  throw new FileNotFoundException($"Missing T2G model at {modelPath}");
+                // if (!File.Exists(configPath)) throw new FileNotFoundException($"Missing T2G config at {configPath}");
+                // if (!File.Exists(vocabPath))  throw new FileNotFoundException($"Missing T2G vocab at {vocabPath}");
+
+                // await RunPython(python, script, job.WorkDir,
+                //     "--translate",
+                //     "--t2g_model",  modelPath,
+                //     "--t2g_config", configPath,
+                //     "--t2g_vocab",  vocabPath,
+                //     "--max_src_len","64","--max_len","100",
+                //     "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
+                //     "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
+                //     "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
+                //     "--t2g_cpu"
+                // );
+
+                var modelPath = _cfg["Pipeline:T2GModel"] ?? "../../t5-finetuned-aslg";
+                Console.WriteLine($"[DEBUG] Using T2G model path (relative): {modelPath}");
+
+
+                Console.WriteLine($"[DEBUG] Resolved T2G model path: {modelPath}");
+
+                if (!Directory.Exists(modelPath))
+                    throw new DirectoryNotFoundException($"T2G model directory not found: {modelPath}");
 
                 await RunPython(python, script, job.WorkDir,
                     "--translate",
-                    "--t2g_model",  modelPath,
-                    "--t2g_config", configPath,
-                    "--t2g_vocab",  vocabPath,
+                    "--t2g_model", modelPath,   
                     "--max_src_len","64","--max_len","100",
                     "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
                     "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
                     "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
                     "--t2g_cpu"
                 );
+
 
                 job.Status = JobState.Finished;
                 job.Results["transcript"] = $"{job.PublicBase}/transcription_output.txt";

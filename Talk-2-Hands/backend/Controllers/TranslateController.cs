@@ -70,6 +70,7 @@ namespace Talk2Hands.Backend.Controllers
             // 4) Register + enqueue job
             var job = new PipelineJob
             {
+                JobId = jobId,               
                 SourceType = "upload",
                 WorkDir = jobWork,
                 PublicBase = $"/jobs/{jobId}"
@@ -101,13 +102,15 @@ namespace Talk2Hands.Backend.Controllers
             var jobId = Guid.NewGuid().ToString("N");
             var jobWork = Path.Combine(jobsRoot, jobId);
             Directory.CreateDirectory(jobWork);
+            
 
             // Step 1: pick a predictable safe filename
             var safeName = $"youtube_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.mp4";
             var videoPath = Path.Combine(jobWork, safeName);
 
             // Step 2: run yt-dlp with that as output target
-            var psi = new ProcessStartInfo {
+            var psi = new ProcessStartInfo
+            {
                 FileName = "yt-dlp",
                 ArgumentList = {
                     "-f", "bv+ba/best",                 // best video + best audio
@@ -138,7 +141,9 @@ namespace Talk2Hands.Backend.Controllers
             await RunFfmpeg(videoPath, wavOut);
 
             // Step 4: register + enqueue pipeline job
-            var job = new PipelineJob {
+            var job = new PipelineJob
+            {
+                JobId = jobId,               
                 SourceType = "youtube",
                 WorkDir = jobWork,
                 PublicBase = $"/jobs/{jobId}"
@@ -147,9 +152,11 @@ namespace Talk2Hands.Backend.Controllers
             await _queue.EnqueueAsync(job);
 
             // Step 5: return response Angular expects
-            return Ok(new {
+            return Ok(new
+            {
                 type = "video",
                 backend = $"{job.PublicBase}/{safeName}",
+                fileName = safeName,
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"
             });
@@ -195,5 +202,44 @@ namespace Talk2Hands.Backend.Controllers
             if (p.ExitCode != 0)
                 throw new Exception($"ffmpeg failed: {stderr}");
         }
+        
+        [HttpGet("download/{jobId}/{fileName}")]
+        public IActionResult Download(string jobId, string fileName)
+        {
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var jobsRoot = Path.Combine(webRoot, "jobs");
+            var jobPath = Path.Combine(jobsRoot, jobId);
+            var filePath = Path.Combine(jobPath, fileName);
+
+            if (!System.IO.File.Exists(filePath))
+                return NotFound();
+
+            // Default MIME type
+            var mimeType = "application/octet-stream"; 
+
+            // Audio types
+            if (fileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
+                mimeType = "audio/mpeg";
+            else if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                mimeType = "audio/wav";
+            else if (fileName.EndsWith(".flac", StringComparison.OrdinalIgnoreCase))
+                mimeType = "audio/flac";
+
+            // Video types
+            else if (fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/mp4";
+            else if (fileName.EndsWith(".mov", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/quicktime";
+            else if (fileName.EndsWith(".avi", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/x-msvideo";
+            else if (fileName.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/x-matroska";
+            else if (fileName.EndsWith(".webm", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/webm";
+
+            // 👇 Always force download
+            return PhysicalFile(filePath, mimeType, fileName);
+        }
+
     }
 }

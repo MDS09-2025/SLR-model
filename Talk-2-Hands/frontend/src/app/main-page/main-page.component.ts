@@ -18,6 +18,7 @@ import { switchMap, filter, takeUntil, take, map, catchError } from 'rxjs/operat
 export class MainPageComponent {
   mediaLink: string = '';
   selectedFile: File | null = null;
+  loading = false;
 
   constructor(private translateService: TranslateService, private router: Router, private mediacontent: MediaTransferService) {}
 
@@ -45,7 +46,12 @@ export class MainPageComponent {
     this.mediacontent.setLink(null); // prefer file if both present
   }
 
+  get isUploadDisabled(): boolean {
+    return this.mediaLink.trim().length > 0;   // disable if link exists
+  }
+
  translate() {
+    this.loading = true; 
     // If a file was picked, upload to backend
     if (this.selectedFile) {
       this.translateService.uploadFile(this.selectedFile).subscribe({
@@ -94,7 +100,8 @@ export class MainPageComponent {
                 // stash results so audio page can show them
                 const withResults = { ...mediaData, results };
                 sessionStorage.setItem('media', JSON.stringify(withResults));
-
+                
+                this.loading = false;  // ✅ stop spinner
                 const isVideo = this.selectedFile!.type.startsWith('video/');
                 this.router.navigate([isVideo ? '/video' : '/audio']);
               },
@@ -107,7 +114,10 @@ export class MainPageComponent {
             });
           }
         },
-        error: (err) => console.error('Error uploading file:', err)
+        error: (err) => {
+          console.error('Error uploading file:', err);
+          this.loading = false;  // ✅ stop spinner
+        }
       });
       return;
     }

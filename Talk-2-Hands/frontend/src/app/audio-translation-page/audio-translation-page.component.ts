@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
+import { TranslateService } from '../services/translate.service';
 
 @Component({
   selector: 'app-audio-translation-page',
@@ -16,8 +17,10 @@ export class AudioTranslationPageComponent implements OnInit{
 
   // Temporary display gloss
   gloss: string | null = null;
+  jobId: string | null = null;
+  fileName: string | null = null;
 
-  constructor(private mediacontent: MediaTransferService) { }
+  constructor(private mediacontent: MediaTransferService, private translateService: TranslateService) { }
   // Injecting the MediaTransferService to access the selected media file
 
   ngOnInit(): void {
@@ -31,6 +34,8 @@ export class AudioTranslationPageComponent implements OnInit{
         this.audioUrl = 'http://localhost:5027' + mediaData.backend;// Use the backend URL for audio
         console.log('Playing audio from backend:', this.audioUrl);
         this.gloss = mediaData.results?.gloss ?? null;
+        this.jobId = mediaData.jobId;
+        this.fileName = mediaData.backend.split('/').pop(); 
       } else {
         console.warn('Stored media is not audio');
       }
@@ -39,4 +44,22 @@ export class AudioTranslationPageComponent implements OnInit{
     }
   }
 
+  downloadAudio() {
+    if (this.jobId && this.fileName) {
+      this.translateService.downloadFile(this.jobId, this.fileName)
+        .subscribe(blob => {
+          // create download link from blob
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = this.fileName!; // keep original name
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url); // cleanup
+        });
+    } else {
+      console.warn('No audio/video available to download');
+    }
+  }
 }

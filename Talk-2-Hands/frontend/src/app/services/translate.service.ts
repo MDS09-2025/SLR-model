@@ -32,4 +32,10 @@ export class TranslateService {
   getResult(jobId: string, which: 'transcript' | 'gloss') {
     return this.http.get(`${this.apiUrl}/result/${jobId}/${which}`, { responseType: 'text' });
   }
+
+  downloadFile(jobId: string, fileName: string) {
+    return this.http.get(`${this.apiUrl}/download/${jobId}/${fileName}`, {
+      responseType: 'blob'  // 👈 important: get binary file
+    });
+  }
 }

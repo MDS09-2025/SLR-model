@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
+import { TranslateService } from '../services/translate.service';
 
 @Component({
   selector: 'app-video-translation-page',
@@ -14,10 +15,13 @@ export class VideoTranslationPageComponent {
   localFile?: File;
   // Temporary display gloss
   gloss: string | null = null;
+  jobId: string | null = null;
+  fileName: string | null = null;
+
 
   @ViewChild('player') playerRef?: ElementRef<HTMLVideoElement>;  // ✅ reference to <video>
   
-  constructor(private mediaService: MediaTransferService){}
+  constructor(private mediaService: MediaTransferService, private translateService: TranslateService){}
 
   ngOnInit(): void {
     console.log('[VideoTranslationPage] ngOnInit called');
@@ -32,6 +36,8 @@ export class VideoTranslationPageComponent {
         this.videoSrc = `http://localhost:5027${mediaData.backend}`;
         this.gloss = mediaData.results?.gloss ?? null;
         console.log('Playing video from backend:', this.videoSrc);
+        this.jobId = mediaData.jobId;
+        this.fileName = mediaData.backend.split('/').pop(); 
       } else {
         console.warn('Stored media is not video');
       }
@@ -51,15 +57,23 @@ export class VideoTranslationPageComponent {
     }
   }
 
-  download() {
-    if (this.localFile) {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(this.localFile);
-      a.download = this.localFile.name;
-      a.click();
-      return;
+  downloadVideo() {
+    if (this.jobId && this.fileName) {
+      this.translateService.downloadFile(this.jobId, this.fileName)
+        .subscribe(blob => {
+          // create download link from blob
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = this.fileName!; // keep original name
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url); // cleanup
+        });
+    } else {
+      console.warn('No audio/video available to download');
     }
-   
-    if (this.videoSrc) window.open(this.videoSrc, '_blank');
   }
+
 }
