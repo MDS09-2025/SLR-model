@@ -1,0 +1,5 @@
+# Gloos 2 Pose
+# git+https://github.com/SignBridgeApp/pose-all.git # pose-format
+num2words
+opencv-python
+opencv-contrib-python
