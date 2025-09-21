@@ -38,4 +38,11 @@ export class TranslateService {
       responseType: 'blob'  // 👈 important: get binary file
     });
   }
+
+  getPoseVideo(jobId: string) {
+    return this.http.get(`${this.apiUrl}/download/${jobId}/${jobId}.mp4`, {
+      responseType: 'blob'
+    });
+  }
+
 }

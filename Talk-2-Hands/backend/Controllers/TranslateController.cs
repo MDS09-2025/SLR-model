@@ -225,6 +225,8 @@ namespace Talk2Hands.Backend.Controllers
                 mimeType = "audio/wav";
             else if (fileName.EndsWith(".flac", StringComparison.OrdinalIgnoreCase))
                 mimeType = "audio/flac";
+            else if (fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                mimeType = "video/mp4";
 
             // Video types
             else if (fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))

@@ -261,6 +261,8 @@ def main():
     ap.add_argument("--render_pose", action="store_true")
     ap.add_argument("--pose_dir", default="Pose_Output")
     ap.add_argument("--gloss2pose_dir", default="../../data/gloss2pose")
+    ap.add_argument("--job_id", required=False, help="Unique job identifier")
+
 
     args = ap.parse_args()
 
@@ -324,9 +326,11 @@ def main():
                 scale_down(pose, 512)
                 p = PoseVisualizer(pose, thickness=2)
                 img = p.save_png(None, p.draw(transparency=True))
+                p.save_video(f"{args.job_id}.mp4", p.draw())
 
                 # save PNG file
-                out_png = os.path.join(args.pose_dir, f"pose_{i:03d}.png")
+                filename = f"{args.job_id}.png" if args.job_id else f"pose_{i:03d}.png"
+                out_png = os.path.join(args.pose_dir, filename)
                 with open(out_png, "wb") as f:
                     f.write(img)
                 print(f"✅ Saved pose image: {out_png} ({' '.join(words)})")

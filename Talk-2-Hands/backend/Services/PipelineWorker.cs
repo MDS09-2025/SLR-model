@@ -96,7 +96,8 @@ public class PipelineWorker : BackgroundService {
                     "--t2g_cpu",
                     "--render_pose",
                     "--pose_dir", Path.Combine(job.WorkDir, "Pose_Output"),
-                    "--gloss2pose_dir", _cfg["Pipeline:Gloss2PoseDir"]
+                    "--gloss2pose_dir", _cfg["Pipeline:Gloss2PoseDir"],
+                    "--job_id", job.JobId 
                 );
 
 

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
@@ -12,13 +12,16 @@ import { TranslateService } from '../services/translate.service';
 })
 
 export class AudioTranslationPageComponent implements OnInit{
+  @ViewChild('audioPlayer', { static: false }) audioPlayer!: ElementRef<HTMLAudioElement>;
+  @ViewChild('poseVideo', { static: false }) poseVideo!: ElementRef<HTMLVideoElement>;
   audioUrl: string | null = null;
-  // This will hold the URL of the audio file to be played
+  poseUrl: string | null = null;
 
   // Temporary display gloss
   gloss: string | null = null;
   jobId: string | null = null;
   fileName: string | null = null;
+  private bound = false;
 
   constructor(private mediacontent: MediaTransferService, private translateService: TranslateService) { }
   // Injecting the MediaTransferService to access the selected media file
@@ -35,6 +38,10 @@ export class AudioTranslationPageComponent implements OnInit{
         console.log('Playing audio from backend:', this.audioUrl);
         this.gloss = mediaData.results?.gloss ?? null;
         this.jobId = mediaData.jobId;
+        this.translateService.getPoseVideo(this.jobId!).subscribe(blob => {
+          this.poseUrl = URL.createObjectURL(blob);
+          console.log('[AudioTranslationPage] Pose video URL:', this.poseUrl);
+        });
         this.fileName = mediaData.backend.split('/').pop(); 
       } else {
         console.warn('Stored media is not audio');
@@ -62,4 +69,37 @@ export class AudioTranslationPageComponent implements OnInit{
       console.warn('No audio/video available to download');
     }
   }
+
+
+  ngAfterViewChecked(): void {
+    console.log('[AudioTranslationPage] ngAfterViewChecked called');
+    console.log('  audioPlayer?', !!this.audioPlayer);
+    console.log('  poseVideo?', !!this.poseVideo);
+    if (!this.bound && this.audioPlayer && this.poseVideo) {
+      const audio = this.audioPlayer.nativeElement;
+      const video = this.poseVideo.nativeElement;
+
+      console.log('[Sync] Binding audio <-> video events');
+      this.bound = true;
+
+      // Auto adjust playback speed to sync durations
+      audio.addEventListener('loadedmetadata', () => {
+        video.addEventListener('loadedmetadata', () => {
+          if (video.duration && audio.duration) {
+            const ratio = video.duration / audio.duration;
+            video.playbackRate = ratio;
+            console.log(`[Sync] Set playbackRate = ${ratio}`);
+          }
+        });
+      });
+
+      audio.addEventListener('play', () => video.play());
+      audio.addEventListener('pause', () => video.pause());
+      audio.addEventListener('ended', () => {
+        video.pause();
+        video.currentTime = 0;
+      });
+    }
+  }
+
 }
