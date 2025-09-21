@@ -325,15 +325,13 @@ def main():
             if pose:
                 scale_down(pose, 512)
                 p = PoseVisualizer(pose, thickness=2)
-                img = p.save_png(None, p.draw(transparency=True))
                 p.save_video(f"{args.job_id}.mp4", p.draw())
 
-                # save PNG file
-                filename = f"{args.job_id}.png" if args.job_id else f"pose_{i:03d}.png"
-                out_png = os.path.join(args.pose_dir, filename)
-                with open(out_png, "wb") as f:
-                    f.write(img)
-                print(f"✅ Saved pose image: {out_png} ({' '.join(words)})")
+                pose_filename = f"{args.job_id}.pose" if args.job_id else f"pose_{i:03d}.pose"
+                out_pose = os.path.join(args.pose_dir, pose_filename)
+                with open(out_pose, "wb") as f:
+                    pose.write(f) # serialize pose to bytes
+                print(f"💾 Saved pose file: {out_pose}")
             else:
                 print(f"⚠️ No pose found for line {i}: {gloss_line}")
 
