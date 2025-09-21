@@ -5,3 +5,10 @@ librosa
 soundfile
 noisereduce
 yt-dlp
+transformers
+scipy
+pose_format
+num2words
+opencv-python
+sentencepiece
+tokenizers

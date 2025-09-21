@@ -11,7 +11,10 @@ public sealed class PipelineJob {
     public string? Error { get; set; }
     public string WorkDir { get; init; } = "";       // physical path: wwwroot/jobs/{jobId}
     public string PublicBase { get; init; } = "";    // public base: /jobs/{jobId}
-    public Dictionary<string,string?> Results { get; } = new() {
-        ["transcript"] = null, ["gloss"] = null
+    public Dictionary<string,string?> Results { get; } = new()
+    {
+        ["transcript"] = null,
+        ["gloss"] = null,
+        ["poses"] = null
     };
 }

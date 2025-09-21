@@ -179,6 +179,7 @@ namespace Talk2Hands.Backend.Controllers
             {
                 "transcript" => Path.Combine(job.WorkDir, "transcription_output.txt"),
                 "gloss" => Path.Combine(job.WorkDir, "gloss_output.txt"),
+                "poses"      => Path.Combine(job.WorkDir, "Pose_Output"),
                 _ => null
             };
             if (file is null || !System.IO.File.Exists(file)) return NotFound("Not ready");

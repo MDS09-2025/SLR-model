@@ -82,10 +82,6 @@ public class PipelineWorker : BackgroundService {
                 // );
 
                 var modelPath = _cfg["Pipeline:T2GModel"] ?? "../../t5-finetuned-aslg";
-                Console.WriteLine($"[DEBUG] Using T2G model path (relative): {modelPath}");
-
-
-                Console.WriteLine($"[DEBUG] Resolved T2G model path: {modelPath}");
 
                 if (!Directory.Exists(modelPath))
                     throw new DirectoryNotFoundException($"T2G model directory not found: {modelPath}");
@@ -97,13 +93,17 @@ public class PipelineWorker : BackgroundService {
                     "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
                     "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
                     "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
-                    "--t2g_cpu"
+                    "--t2g_cpu",
+                    "--render_pose",
+                    "--pose_dir", Path.Combine(job.WorkDir, "Pose_Output"),
+                    "--gloss2pose_dir", _cfg["Pipeline:Gloss2PoseDir"]
                 );
 
 
                 job.Status = JobState.Finished;
                 job.Results["transcript"] = $"{job.PublicBase}/transcription_output.txt";
                 job.Results["gloss"]      = $"{job.PublicBase}/gloss_output.txt";
+                job.Results["poses"]      = $"{job.PublicBase}/Pose_Output";
                 Save(job);
             }
             catch (Exception ex) {

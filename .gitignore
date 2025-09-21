@@ -26,3 +26,13 @@ __pycache__/
 transformer_model*.json
 transformer_vocab.json
 transformer_model.pt
+
+# Ignore all .pose files
+*.pose
+
+# Ignore the gloss2pose data folder
+data/gloss2pose/
+data/gloss2pose.zip
+
+# But keep an empty folder tracked (optional: add .gitkeep)
+!data/gloss2pose/.gitkeep
