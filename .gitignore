@@ -36,3 +36,17 @@ data/gloss2pose.zip
 
 # But keep an empty folder tracked (optional: add .gitkeep)
 !data/gloss2pose/.gitkeep
+
+# Ignore uploaded files
+Talk-2-Hands/backend/wwwroot/uploads/
+Talk-2-Hands/backend/wwwroot/jobs/
+*.png
+# Ignore virtual environments
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
