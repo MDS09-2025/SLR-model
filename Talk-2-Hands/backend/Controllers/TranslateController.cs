@@ -21,12 +21,6 @@ namespace Talk2Hands.Backend.Controllers
             _env = env; _store = store; _queue = queue; _cfg = cfg;
         }
 
-        // [HttpPost("link")]
-        // public IActionResult TranslateFromLink([FromBody] LinkRequest request)
-        // {
-        //     return Ok(new { message = $"Got link: {request.Url}" });
-        // }
-
         // POST /api/translate/upload
         [HttpPost("upload")]
         [RequestSizeLimit(long.MaxValue)]
@@ -80,12 +74,26 @@ namespace Talk2Hands.Backend.Controllers
 
             // 5) IMPORTANT: match your Angular expectation → res.backend is a URL
             //    You store { backend: res, type, fileName } so res must have "backend" string
-            return Ok(new
+            if (isVideo)
             {
-                backend = $"{job.PublicBase}/{safeName}", // ✅ always under jobs
-                jobId = job.JobId,
-                statusUrl = $"/api/translate/status/{job.JobId}"
-            });
+                // for video uploads: backend points to the original video
+                return Ok(new
+                {
+                    backend = $"{job.PublicBase}/{job.JobId}.mp4",
+                    jobId = job.JobId,
+                    statusUrl = $"/api/translate/status/{job.JobId}"
+                });
+            }
+            else
+            {
+                // for audio uploads: backend points to the padded audio (produced later by pipeline)
+                return Ok(new
+                {
+                    backend = $"{job.PublicBase}/{job.JobId}.wav",
+                    jobId = job.JobId,
+                    statusUrl = $"/api/translate/status/{job.JobId}"
+                });
+            }
         }
 
         public sealed record YoutubeReq(string Url);
@@ -155,7 +163,7 @@ namespace Talk2Hands.Backend.Controllers
             return Ok(new
             {
                 type = "video",
-                backend = $"{job.PublicBase}/{safeName}",
+                backend = $"{job.PublicBase}//{job.JobId}.mp4",
                 fileName = safeName,
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"

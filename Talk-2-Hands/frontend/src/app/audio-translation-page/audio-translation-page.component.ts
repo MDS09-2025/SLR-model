@@ -86,8 +86,12 @@ export class AudioTranslationPageComponent implements OnInit{
       audio.addEventListener('loadedmetadata', () => {
         video.addEventListener('loadedmetadata', () => {
           if (video.duration && audio.duration) {
-            // const ratio = video.duration / audio.duration;
-            video.playbackRate = 1.3;
+            if (video.duration > audio.duration) {
+              audio.loop = false;
+              const diff = video.duration - audio.duration;
+              console.log(`[Sync] Padding audio by ${diff.toFixed(2)}s`);
+            }
+            // video.playbackRate = 1.3;
             // console.log(`[Sync] Set playbackRate = ${ratio}`);
           }
         });

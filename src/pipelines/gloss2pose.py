@@ -229,17 +229,24 @@ def scale_up(pose: Pose, value: int = 2):
 
 
 def prepare_glosses(sentence: str) -> List[str]:
-    glosses: List[str] = re.findall(r'\b[a-zA-Z0-9]+\b', sentence.lower())
+    glosses: List[str] = re.findall(r'[a-zA-Z0-9-]+', sentence.lower())
     final_glosses = []
+    drop_words = {"am", "is", "are", "was", "were", "be", "been", "being"}
 
     for word in glosses:
+        if word in drop_words:
+            print(f"[DEBUG] Dropping word: '{word}'")  # 👈 debugging line
+            continue  # skip BE verbs
         if word.isdigit():
             # expand numbers (e.g., "25" → "twenty five")
             final_glosses.extend(num2words(int(word)).split())
         else:
             # if gloss has a hyphen, keep only the part after the last hyphen
-            if "-" in word:
-                word = word.split("-")[-1]
-            final_glosses.append(word)
-
+            cleaned = word.split("-")[-1]
+            if cleaned in drop_words:
+                print(f"[DEBUG] Dropping word after hyphen split: '{cleaned}'")
+                continue
+            final_glosses.append(cleaned)
+    print(f"[DEBUG] Gloss after cleaning: '{final_glosses}'") 
     return final_glosses
+

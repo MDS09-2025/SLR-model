@@ -6,7 +6,7 @@
   <!-- Main -->
   <main class="max-w-5xl mx-auto relative z-10">
     <!-- Main video player card -->
-    <div #videoCard class="relative rounded-2xl overflow-hidden bg-black ring-1 ring-white/10 shadow-2xl">
+    <div #videoCard class="relative w-11/12 max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black ring-1 ring-white/10 shadow-2xl">
       <div class="aspect-video">
         <video
           #player
@@ -25,15 +25,14 @@
         {{ gloss }}
         </span>
     </div>
-    <div class="mt-4 flex items-center justify-between gap-3">
+    <!-- Buttons aligned with video -->
+    <div class="w-11/12 max-w-4xl mx-auto mt-4 flex items-center justify-between gap-3">
       <div class="flex gap-3">
-        <!-- Download -->
         <button
           class="rounded-full px-6 py-3 bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90"
           (click)="downloadVideo()">
           Download
         </button>
-        <!-- Full screen -->
         <button
           class="rounded-full px-6 py-3 bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90"
           (click)="toggleFullScreen()">
@@ -41,5 +40,6 @@
         </button>
       </div>
     </div>
+
   </main>
 </div>

@@ -15,103 +15,103 @@ public class PipelineWorker : BackgroundService {
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-        await foreach (var job in _queue.DequeueAllAsync(stoppingToken)) {
-            try {
-                job.Status = JobState.Running; Save(job);
+        await foreach (var job in _queue.DequeueAllAsync(stoppingToken))
+        {
+            job.Status = JobState.Running; Save(job);
 
-                var raw      = Path.Combine(job.WorkDir, "Raw_Audio");
-                var clean    = Path.Combine(job.WorkDir, "Clean_Audio");
-                var transDir = Path.Combine(job.WorkDir, "Transcripts");
-                Directory.CreateDirectory(raw);
-                Directory.CreateDirectory(clean);
-                Directory.CreateDirectory(transDir);
+            var raw = Path.Combine(job.WorkDir, "Raw_Audio");
+            var clean = Path.Combine(job.WorkDir, "Clean_Audio");
+            var transDir = Path.Combine(job.WorkDir, "Transcripts");
+            Directory.CreateDirectory(raw);
+            Directory.CreateDirectory(clean);
+            Directory.CreateDirectory(transDir);
 
-                var python = _cfg["Pipeline:PythonPath"] ?? "python3";
-                Console.WriteLine($"[DEBUG] Running python: {python}");
+            var python = _cfg["Pipeline:PythonPath"] ?? "python3";
+            Console.WriteLine($"[DEBUG] Running python: {python}");
 
-                var scriptSetting = _cfg["Pipeline:ScriptPath"] ?? "python/audio_text_gloss.py";
-                var script = Path.IsPathRooted(scriptSetting)
-                    ? scriptSetting
-                    : Path.Combine(_env.ContentRootPath, scriptSetting);
+            var scriptSetting = _cfg["Pipeline:ScriptPath"] ?? "python/audio_text_gloss.py";
+            var script = Path.IsPathRooted(scriptSetting)
+                ? scriptSetting
+                : Path.Combine(_env.ContentRootPath, scriptSetting);
 
-                if (!System.IO.File.Exists(script))
-                    throw new FileNotFoundException($"Pipeline script not found: {script}");
+            if (!System.IO.File.Exists(script))
+                throw new FileNotFoundException($"Pipeline script not found: {script}");
 
-                // 1) preprocess
-                job.Steps.Add("preprocess"); Save(job);
-                await RunPython(python, script, job.WorkDir,
-                    "--preprocess",
-                    "--raw_dir", raw, "--clean_dir", clean,
-                    "--target_sr","48000", "--chunk_sec","10.0",
-                    "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
-                    "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt")
-                );
+            // 1) preprocess
+            job.Steps.Add("preprocess"); Save(job);
+            await RunPython(python, script, job.WorkDir,
+                "--preprocess",
+                "--raw_dir", raw, "--clean_dir", clean,
+                "--target_sr", "48000", "--chunk_sec", "10.0",
+                "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
+                "--gloss_txt", Path.Combine(job.WorkDir, "gloss_output.txt")
+            );
 
-                // 2) transcribe
-                job.Steps.Add("transcribe"); Save(job);
-                await RunPython(python, script, job.WorkDir,
-                    "--transcribe",
-                    "--clean_dir", clean,
-                    "--whisper_size", _cfg["Pipeline:WhisperSize"] ?? "large-v3",
-                    "--asr_device",    _cfg["Pipeline:AsrDevice"]   ?? "cpu",
-                    "--compute_type",  _cfg["Pipeline:ComputeType"] ?? "float32",
-                    "--beam_size",     _cfg["Pipeline:BeamSize"]    ?? "5"
-                );
+            // 2) transcribe
+            job.Steps.Add("transcribe"); Save(job);
+            await RunPython(python, script, job.WorkDir,
+                "--transcribe",
+                "--clean_dir", clean,
+                "--whisper_size", _cfg["Pipeline:WhisperSize"] ?? "large-v3",
+                "--asr_device", _cfg["Pipeline:AsrDevice"] ?? "cpu",
+                "--compute_type", _cfg["Pipeline:ComputeType"] ?? "float32",
+                "--beam_size", _cfg["Pipeline:BeamSize"] ?? "5"
+            );
 
-                // 3) translate
-                job.Steps.Add("translate"); Save(job);
-                // var modelPath  = ResolvePath(_cfg["Pipeline:T2GModel"]  ?? "../../transformer_model.pt");
-                // Console.WriteLine($"[DEBUG] _cfg[T2GModel]: {_cfg["Pipeline:T2GModel"]}");
-                // var configPath = ResolvePath(_cfg["Pipeline:T2GConfig"] ?? "../../transformer_model_config.json");
-                // var vocabPath  = ResolvePath(_cfg["Pipeline:T2GVocab"]  ?? "../../transformer_vocab.json");
+            // 3) translate
+            job.Steps.Add("translate"); Save(job);
 
-                // if (!File.Exists(modelPath))  throw new FileNotFoundException($"Missing T2G model at {modelPath}");
-                // if (!File.Exists(configPath)) throw new FileNotFoundException($"Missing T2G config at {configPath}");
-                // if (!File.Exists(vocabPath))  throw new FileNotFoundException($"Missing T2G vocab at {vocabPath}");
+            var modelPath = _cfg["Pipeline:T2GModel"] ?? "../../t5-finetuned-aslg";
 
-                // await RunPython(python, script, job.WorkDir,
-                //     "--translate",
-                //     "--t2g_model",  modelPath,
-                //     "--t2g_config", configPath,
-                //     "--t2g_vocab",  vocabPath,
-                //     "--max_src_len","64","--max_len","100",
-                //     "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
-                //     "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
-                //     "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
-                //     "--t2g_cpu"
-                // );
+            if (!Directory.Exists(modelPath))
+                throw new DirectoryNotFoundException($"T2G model directory not found: {modelPath}");
 
-                var modelPath = _cfg["Pipeline:T2GModel"] ?? "../../t5-finetuned-aslg";
+            var args = new List<string> {
+            "--translate",
+                "--t2g_model", modelPath,
+                "--max_src_len","64","--max_len","100",
+                "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
+                "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
+                "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
+                "--t2g_cpu",
+                "--render_pose",
+                "--pose_dir", Path.Combine(job.WorkDir, "Pose_Output"),
+                "--gloss2pose_dir", _cfg["Pipeline:Gloss2PoseDir"],
+                "--job_id", job.JobId
+            };
 
-                if (!Directory.Exists(modelPath))
-                    throw new DirectoryNotFoundException($"T2G model directory not found: {modelPath}");
+            var videoExtensions = new[] { ".mp4", ".mov", ".mkv", ".avi", ".webm" };
+            var mediaFile = Directory.GetFiles(job.WorkDir)
+                .FirstOrDefault(f => videoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
 
-                await RunPython(python, script, job.WorkDir,
-                    "--translate",
-                    "--t2g_model", modelPath,   
-                    "--max_src_len","64","--max_len","100",
-                    "--t2g_decoder","beam","--t2g_beam","8","--t2g_lenpen","0.7",
-                    "--transcript_txt", Path.Combine(job.WorkDir, "transcription_output.txt"),
-                    "--gloss_txt",      Path.Combine(job.WorkDir, "gloss_output.txt"),
-                    "--t2g_cpu",
-                    "--render_pose",
-                    "--pose_dir", Path.Combine(job.WorkDir, "Pose_Output"),
-                    "--gloss2pose_dir", _cfg["Pipeline:Gloss2PoseDir"],
-                    "--job_id", job.JobId 
-                );
-
-
-                job.Status = JobState.Finished;
-                job.Results["transcript"] = $"{job.PublicBase}/transcription_output.txt";
-                job.Results["gloss"]      = $"{job.PublicBase}/gloss_output.txt";
-                job.Results["poses"]      = $"{job.PublicBase}/Pose_Output";
-                Save(job);
+            if (!string.IsNullOrEmpty(mediaFile))
+            {
+                args.Add("--input_video");
+                args.Add(mediaFile);
             }
-            catch (Exception ex) {
-                job.Status = JobState.Failed;
-                job.Error = ex.ToString();
-                Save(job);
+
+            await RunPython(python, script, job.WorkDir, args.ToArray());
+
+            job.Status = JobState.Finished;
+            job.Results["transcript"] = $"{job.PublicBase}/transcription_output.txt";
+            job.Results["gloss"] = $"{job.PublicBase}/gloss_output.txt";
+            job.Results["poses"] = $"{job.PublicBase}/Pose_Output";
+
+            var overlayPath = Path.Combine(job.WorkDir, "Pose_Output", $"{job.JobId}_overlay.mp4");
+            if (System.IO.File.Exists(overlayPath))
+            {
+                job.Results["pose_video"] = $"{job.PublicBase}/Pose_Output/{job.JobId}_overlay.mp4";
             }
+
+            else
+            {
+                // fallback to plain pose video (generated by pipeline.py)
+                var plainPosePath = Path.Combine(job.WorkDir, $"{job.JobId}.mp4");
+                if (System.IO.File.Exists(plainPosePath))
+                    job.Results["pose_video"] = $"{job.PublicBase}/{job.JobId}.mp4";
+            }
+
+            Save(job);
         }
     }
 
