@@ -1,12 +1,11 @@
 <!-- Video Translation Page -->
-<div class="bg-[url('/images/LandingPage.svg')] bg-cover bg-center min-h-screen text-white p-8 relative overflow-hidden">
-  <!-- Navbar -->
+<div class = "bg-[url('/images/LandingPageLight.png')] dark:bg-[url('/images/LandingPage.svg')] bg-cover bg-center min-h-screen text-white p-10">
   <app-nav-bar></app-nav-bar>
 
   <!-- Main -->
   <main class="max-w-5xl mx-auto relative z-10">
     <!-- Main video player card -->
-    <div #videoCard class="relative w-11/12 max-w-4xl mx-auto rounded-2xl overflow-hidden bg-black ring-1 ring-white/10 shadow-2xl">
+    <div #videoCard class="relative w-11/12 max-w-4xl mx-auto rounded-2xl overflow-hidden bg-neutral-500 dark:bg-black ring-1 ring-white/10 shadow-2xl">
       <div class="aspect-video">
         <video
           #player
@@ -29,15 +28,15 @@
     <div class="w-11/12 max-w-4xl mx-auto mt-4 flex items-center justify-between gap-3">
       <div class="flex gap-3">
         <button
-          class="rounded-full px-6 py-3 bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90"
+          class="rounded-full px-6 py-3 font-redhat font-semibold bg-gradient-to-r from-[#002EFF] to-[#869AFF] dark:from-[#5271FF] dark:to-[#B6C3FF] hover:opacity-90"
           (click)="downloadVideo()">
           Download
         </button>
         <button
-          class="rounded-full px-6 py-3 bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-90"
+          class="rounded-full px-6 py-3 font-redhat font-semibold bg-gradient-to-r from-[#002EFF] to-[#869AFF] dark:from-[#5271FF] dark:to-[#B6C3FF] hover:opacity-90"
           (click)="toggleFullScreen()">
           Full Screen
-        </button>
+        </button> 
       </div>
     </div>
 

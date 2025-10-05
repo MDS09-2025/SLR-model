@@ -1,7 +1,5 @@
-<div class="bg-[url('/images/LandingPage.svg')] bg-cover bg-center h-screen text-white p-10">
-    <div class="flex items-center justify-between mb-0">
-        <app-nav-bar></app-nav-bar>
-    </div>
+<div class = "bg-[url('/images/LandingPageLight.png')] dark:bg-[url('/images/LandingPage.svg')] bg-cover bg-center min-h-screen text-white p-10">
+    <app-nav-bar></app-nav-bar>
     <!-- Main Content -->
     <div class="flex flex-col items-center justify-center flex-1">
         
@@ -14,7 +12,7 @@
             </audio>
         </ng-container>
         <ng-template #noAudio>
-            <p class="text-gray-400 text-center">No audio file found. Please upload again.</p>
+            <p class="text-gray-900 dark:text-gray-400 text-center">No audio file found. Please upload again.</p>
         </ng-template>
     </div>
     
@@ -38,8 +36,8 @@
      <div class="w-[600px] flex justify-end">
             <button
                 (click)="downloadAudio()"
-                class="mt-0 rounded-full px-8 py-3 text-white font-semibold
-                        bg-gradient-to-r from-[#B6C3FF] to-[#5271FF] hover:opacity-100 transition w-fit">
+                class="mt-0 rounded-full px-8 py-3 text-white font-redhat font-semibold
+                        bg-gradient-to-r from-[#002EFF] to-[#869AFF] dark:from-[#5271FF] dark:to-[#B6C3FF] hover:opacity-100 transition w-fit">
                 Download
             </button>
         </div>

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
 import { TranslateService } from '../services/translate.service';
+import { ThemeService } from '../services/theme.service';
 
 @Component({
   selector: 'app-audio-translation-page',
@@ -22,12 +23,14 @@ export class AudioTranslationPageComponent implements OnInit{
   jobId: string | null = null;
   fileName: string | null = null;
   private bound = false;
+  isDarkMode = false;
 
-  constructor(private mediacontent: MediaTransferService, private translateService: TranslateService) { }
+  constructor(private mediacontent: MediaTransferService, private translateService: TranslateService, private theme: ThemeService) { }
   // Injecting the MediaTransferService to access the selected media file
 
   ngOnInit(): void {
     console.log('[AudioTranslationPage] ngOnInit called');
+    this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
     const stored = sessionStorage.getItem('media');
     console.log('[AudioTranslationPage] Stored media:', stored);
     if (stored) {

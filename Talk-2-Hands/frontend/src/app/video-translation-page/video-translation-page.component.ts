@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
 import { TranslateService } from '../services/translate.service';
+import { ThemeService } from '../services/theme.service';
 
 @Component({
   selector: 'app-video-translation-page',
@@ -17,14 +18,16 @@ export class VideoTranslationPageComponent {
   gloss: string | null = null;
   jobId: string | null = null;
   fileName: string | null = null;
+  isDarkMode = false;
 
 
   @ViewChild('player') playerRef?: ElementRef<HTMLVideoElement>;  // ✅ reference to <video>
   
-  constructor(private mediaService: MediaTransferService, private translateService: TranslateService){}
+  constructor(private mediaService: MediaTransferService, private translateService: TranslateService, private theme: ThemeService){}
 
   ngOnInit(): void {
     console.log('[VideoTranslationPage] ngOnInit called');
+    this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
     const stored = sessionStorage.getItem('media');
     console.log('[VideoTranslationPage] Stored media:', stored);
 
