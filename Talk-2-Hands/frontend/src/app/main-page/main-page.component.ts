@@ -8,6 +8,7 @@ import { MediaTransferService } from '../services/media-transfer.service';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { timer, EMPTY, forkJoin } from 'rxjs';
 import { switchMap, filter, takeUntil, take, map, catchError } from 'rxjs/operators';
+import { ThemeService } from '../services/theme.service';
 
 @Component({
   selector: 'app-main-page',
@@ -19,8 +20,13 @@ export class MainPageComponent {
   mediaLink: string = '';
   selectedFile: File | null = null;
   loading = false;
+  isDarkMode = false;
 
-  constructor(private translateService: TranslateService, private router: Router, private mediacontent: MediaTransferService) {}
+  constructor(private translateService: TranslateService, private router: Router, private mediacontent: MediaTransferService, private theme: ThemeService) {}
+
+  ngOnInit(): void {
+    this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
+  }
 
   sendLink() {
     this.translateService.sendLink(this.mediaLink).subscribe({
