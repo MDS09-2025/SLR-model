@@ -57,7 +57,6 @@ export class MainPageComponent {
   }
 
  translate() {
-    this.loading = true; 
     // If a file was picked, upload to backend
     if (this.selectedFile) {
       this.translateService.uploadFile(this.selectedFile).subscribe({
@@ -79,50 +78,11 @@ export class MainPageComponent {
             };
 
             sessionStorage.setItem('media', JSON.stringify(mediaData));
-
-            // ---- Poll until Finished (or Failed) BEFORE navigating ----
-            const jobId = res.jobId;
-
-            timer(0, 2000).pipe(
-              switchMap(() => this.translateService.getStatus(jobId)),
-              // stop polling if failed
-              takeUntil(
-                timer(0, 2000).pipe(
-                  switchMap(() => this.translateService.getStatus(jobId)),
-                  filter((j: any) => j.status === 3),
-                  take(1)
-                )
-              ),
-              filter((j: any) => j.status === 2),
-              take(1),
-              switchMap(() =>
-                forkJoin({
-                  transcript: this.translateService.getResult(jobId, 'transcript').pipe(catchError(() => EMPTY)),
-                  gloss:       this.translateService.getResult(jobId, 'gloss').pipe(catchError(() => EMPTY)),
-                })
-              )
-            ).subscribe({
-              next: (results) => {
-                // stash results so audio page can show them
-                const withResults = { ...mediaData, results };
-                sessionStorage.setItem('media', JSON.stringify(withResults));
-                
-                this.loading = false;  // ✅ stop spinner
-                const isVideo = this.selectedFile!.type.startsWith('video/');
-                this.router.navigate([isVideo ? '/video' : '/audio']);
-              },
-              error: (e) => {
-                console.error('Polling failed', e);
-                // navigate anyway, audio page can show an error/“failed” state
-                const isVideo = this.selectedFile!.type.startsWith('video/');
-                this.router.navigate([isVideo ? '/video' : '/audio']);
-              }
-            });
+            this.router.navigate(['/loading']);
           }
         },
         error: (err) => {
           console.error('Error uploading file:', err);
-          this.loading = false;  // ✅ stop spinner
         }
       });
       return;
@@ -138,37 +98,7 @@ export class MainPageComponent {
             type: 'video' // ensure it's flagged as video
           };
           sessionStorage.setItem('media', JSON.stringify(mediaData));
-
-          const jobId = res.jobId;
-
-          timer(0, 2000).pipe(
-            switchMap(() => this.translateService.getStatus(jobId)),
-            takeUntil(
-              timer(0, 2000).pipe(
-                switchMap(() => this.translateService.getStatus(jobId)),
-                filter((j: any) => j.status === 3), // failed
-                take(1)
-              )
-            ),
-            filter((j: any) => j.status === 2),
-            take(1),
-            switchMap(() =>
-              forkJoin({
-                transcript: this.translateService.getResult(jobId, 'transcript').pipe(catchError(() => EMPTY)),
-                gloss:      this.translateService.getResult(jobId, 'gloss').pipe(catchError(() => EMPTY)),
-              })
-            )
-          ).subscribe({
-            next: (results) => {
-              const withResults = { ...mediaData, results };
-              sessionStorage.setItem('media', JSON.stringify(withResults));
-              this.router.navigate(['/video']);
-            },
-            error: (e) => {
-              console.error('Polling failed', e);
-              this.router.navigate(['/video']);
-            }
-          });
+          this.router.navigate(['/loading']);
         },
         error: (err) => console.error('Error sending YouTube link:', err)
       });

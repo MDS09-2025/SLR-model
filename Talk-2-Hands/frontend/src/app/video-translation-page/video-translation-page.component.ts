@@ -20,7 +20,6 @@ export class VideoTranslationPageComponent {
   fileName: string | null = null;
   isDarkMode = false;
 
-
   @ViewChild('player') playerRef?: ElementRef<HTMLVideoElement>;  // ✅ reference to <video>
   
   constructor(private mediaService: MediaTransferService, private translateService: TranslateService, private theme: ThemeService){}
