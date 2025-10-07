@@ -50,6 +50,18 @@ def pick_device(force_cpu=False):
         return torch.device("mps")
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def estimate_total_audio_minutes(audio_dir):
+    """Estimate total duration (in minutes) of all audio files in a directory."""
+    total = 0.0
+    for f in os.listdir(audio_dir):
+        if f.lower().endswith((".wav", ".mp3", ".flac", ".m4a")):
+            try:
+                dur = librosa.get_duration(filename=os.path.join(audio_dir, f))
+                total += dur
+            except Exception:
+                pass
+    return total / 60.0  # convert to minutes
+
 # ---------------------------
 # Utility: worker cleanup
 # ---------------------------
@@ -153,7 +165,15 @@ def preprocess_audio_parallel(input_dir="Raw_Audio", output_dir="Clean_Audio",
     ensure_empty_dir(output_dir)
     exts = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
     files = [f for f in os.listdir(input_dir) if f.lower().endswith(exts)]
-    
+
+    # Estimate total audio length to decide sequential vs parallel
+    total_min = estimate_total_audio_minutes(input_dir)
+    print(f"🕐 Estimated total audio length: {total_min:.2f} minutes")
+
+    if total_min < 2 * num_workers:
+        print(f"⚠️ Short total audio (< {2 * num_workers} min). Using single-process mode for efficiency.")
+        num_workers = 1
+
     if not files:
         print("No audio files found in input directory")
         return
@@ -167,8 +187,15 @@ def preprocess_audio_parallel(input_dir="Raw_Audio", output_dir="Clean_Audio",
     print(f"Processing {len(files)} files with {num_workers} workers...")
     
     # Process files in parallel
-    with mp.Pool(num_workers) as pool:
-        pool.map(preprocess_single_file, work_items)
+    if num_workers == 1:
+        print("Running sequential preprocessing...")
+        for item in work_items:
+            preprocess_single_file(item)
+    else:
+        print(f"Running parallel preprocessing with {num_workers} workers...")
+        with mp.Pool(num_workers) as pool:
+            pool.map(preprocess_single_file, work_items)
+
 
     print("Parallel preprocessing done.")
 
@@ -273,6 +300,15 @@ def transcribe_dir_parallel(audio_dir, out_dir, model_size="medium",
     if not files:
         print("No audio files found for transcription")
         return
+    
+    # Estimate total audio length
+    total_min = estimate_total_audio_minutes(audio_dir)
+    print(f"🕐 Estimated total audio length: {total_min:.2f} minutes")
+
+    # Auto-switch between sequential and parallel
+    if total_min < 2 * num_workers:
+        print(f"⚠️ Short total audio (< {2 * num_workers} min). Using single-process mode for efficiency.")
+        num_workers = 1
     
     # Group files by base name (for chunk reassembly)
     groups = defaultdict(list)
@@ -472,6 +508,11 @@ def translate_file_parallel(model_dir, device, in_txt, out_txt,
     if not lines:
         print("No text lines found for translation")
         return
+    
+    # Auto-switch to sequential mode if few text lines
+    if len(lines) < 2 * num_workers:
+        print(f"⚠️ Few text lines ({len(lines)}). Using single-process mode for efficiency.")
+        num_workers = 1
     
     print(f"Translating {len(lines)} lines to gloss using {num_workers} workers...")
     
