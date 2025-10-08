@@ -4,10 +4,12 @@ import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
 import { TranslateService } from '../services/translate.service';
 import { ThemeService } from '../services/theme.service';
+import { FormsModule } from '@angular/forms'; 
+import { NgZone } from '@angular/core';
 
 @Component({
   selector: 'app-audio-translation-page',
-  imports: [NavBarComponent, CommonModule],
+  imports: [NavBarComponent, CommonModule, FormsModule],
   templateUrl: './audio-translation-page.component.html',
   styleUrl: './audio-translation-page.component.css'
 })
@@ -15,6 +17,7 @@ import { ThemeService } from '../services/theme.service';
 export class AudioTranslationPageComponent implements OnInit{
   @ViewChild('audioPlayer', { static: false }) audioPlayer!: ElementRef<HTMLAudioElement>;
   @ViewChild('poseVideo', { static: false }) poseVideo!: ElementRef<HTMLVideoElement>;
+  @ViewChild('progressBar') progressBar!: ElementRef<HTMLInputElement>;
   audioUrl: string | null = null;
   poseUrl: string | null = null;
 
@@ -24,8 +27,15 @@ export class AudioTranslationPageComponent implements OnInit{
   fileName: string | null = null;
   private bound = false;
   isDarkMode = false;
+  isPlaying = false;
+  currentTime = 0;
+  duration = 0;
+  private rafId: number | null = null;
+  showSpeedMenu = false;
+  playbackRate = 1.0;
+  availableRates = [0.5, 1.0, 1.25, 1.5, 2.0];
 
-  constructor(private mediacontent: MediaTransferService, private translateService: TranslateService, private theme: ThemeService) { }
+  constructor(private mediacontent: MediaTransferService, private translateService: TranslateService, private theme: ThemeService, private ngZone: NgZone) { }
   // Injecting the MediaTransferService to access the selected media file
 
   ngOnInit(): void {
@@ -75,23 +85,165 @@ export class AudioTranslationPageComponent implements OnInit{
 
 
   ngAfterViewChecked(): void {
-    console.log('[AudioTranslationPage] ngAfterViewChecked called');
-    console.log('  audioPlayer?', !!this.audioPlayer);
-    console.log('  poseVideo?', !!this.poseVideo);
-    if (!this.bound && this.audioPlayer && this.poseVideo) {
-      const audio = this.audioPlayer.nativeElement;
-      const video = this.poseVideo.nativeElement;
+  if (this.audioPlayer && !this.bound) {
+    const audio = this.audioPlayer.nativeElement;
+    this.bound = true;
 
-      console.log('[Sync] Binding audio <-> video events');
-      this.bound = true;
+    const updateProgress = () => {
+      // runOutsideAngular to prevent triggering change detection too often
+      this.ngZone.runOutsideAngular(() => {
+        this.currentTime = audio.currentTime;
 
-      audio.addEventListener('play', () => video.play());
-      audio.addEventListener('pause', () => video.pause());
-      audio.addEventListener('ended', () => {
-        video.pause();
-        video.currentTime = 0;
+        // Only call detectChanges when necessary
+        this.ngZone.run(() => {});
+      });
+
+      if (!audio.paused) {
+        this.rafId = requestAnimationFrame(updateProgress);
+      }
+    };
+
+    audio.addEventListener('play', () => {
+      this.rafId = requestAnimationFrame(updateProgress);
+    });
+
+    audio.addEventListener('pause', () => {
+      if (this.rafId) cancelAnimationFrame(this.rafId);
+    });
+
+    audio.addEventListener('ended', () => {
+      if (this.rafId) cancelAnimationFrame(this.rafId);
+      this.isPlaying = false;
+      this.currentTime = 0;
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      this.duration = audio.duration;
+    });
+  }
+}
+
+togglePlay() {
+  const audio = this.audioPlayer?.nativeElement;
+  const video = this.poseVideo?.nativeElement;
+  if (!audio) return;
+
+  if (audio.paused) {
+    audio.play();
+    if (video) {
+      video.currentTime = audio.currentTime; // keep synced
+      video.play().catch(() => {
+        console.warn('[PoseVideo] Autoplay blocked, waiting for user interaction.');
       });
     }
+    this.isPlaying = true;
+  } else {
+    audio.pause();
+    if (video) video.pause();
+    this.isPlaying = false;
   }
+}
 
+seek(event: Event) {
+  const audio = this.audioPlayer?.nativeElement;
+  if (!audio) return;
+
+  const value = parseFloat((event.target as HTMLInputElement).value);
+  audio.currentTime = value;
+  this.currentTime = value;
+}
+
+formatTime(time: number): string {
+  if (!time || isNaN(time)) return '0:00';
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+ngAfterViewInit() {
+  const audio = this.audioPlayer.nativeElement;
+  const slider = this.progressBar.nativeElement;
+  const video = this.poseVideo?.nativeElement;
+
+  audio.addEventListener('loadedmetadata', () => {
+    this.duration = audio.duration;
+  });
+
+  const update = () => {
+    if (!audio.paused) {
+      const percent = (audio.currentTime / audio.duration) * 100;
+      slider.value = percent.toString();
+      this.currentTime = audio.currentTime;
+
+      // 🎨 Dynamic fill color
+      // 🎨 improved dark/light contrast
+      const playedColor = this.isDarkMode ? '#7B9FFF' : '#5371ff';   // brighter neon blue
+      const remainingColor = this.isDarkMode ? '#2A2F38' : '#E5E7EB'; // darker background gray
+      slider.style.background = `linear-gradient(to right, ${playedColor} ${percent}%, ${remainingColor} ${percent}%)`;
+
+      // 🧩 Keep video synced
+      if (video && Math.abs(video.currentTime - audio.currentTime) > 0.1) {
+        video.currentTime = audio.currentTime;
+      }
+
+      requestAnimationFrame(update);
+    }
+  };
+
+  audio.addEventListener('play', () => {
+    this.isPlaying = true;
+    requestAnimationFrame(update);
+  });
+
+  audio.addEventListener('pause', () => {
+    this.isPlaying = false;
+  });
+
+  slider.addEventListener('input', () => {
+    const seekTime = (parseFloat(slider.value) / 100) * audio.duration;
+    audio.currentTime = seekTime;
+    this.currentTime = seekTime;
+  });
+}
+
+rewind(seconds: number = 1) {
+  const audio = this.audioPlayer?.nativeElement;
+  const video = this.poseVideo?.nativeElement;
+  if (!audio) return;
+
+  audio.currentTime = Math.max(audio.currentTime - seconds, 0);
+  this.currentTime = audio.currentTime;
+
+  if (video) {
+    video.currentTime = audio.currentTime; // stay synced
+  }
+}
+
+forward(seconds: number = 1) {
+  const audio = this.audioPlayer?.nativeElement;
+  const video = this.poseVideo?.nativeElement;
+  if (!audio) return;
+
+  audio.currentTime = Math.min(audio.currentTime + seconds, audio.duration);
+  this.currentTime = audio.currentTime;
+
+  if (video) {
+    video.currentTime = audio.currentTime; // stay synced
+  }
+}
+
+toggleSpeedMenu() {
+  this.showSpeedMenu = !this.showSpeedMenu;
+}
+
+
+setPlaybackRate(rate: number) {
+  const audio = this.audioPlayer?.nativeElement;
+  const video = this.poseVideo?.nativeElement;
+  this.playbackRate = rate;
+
+  if (audio) audio.playbackRate = rate;
+  if (video) video.playbackRate = rate;
+  this.showSpeedMenu = false;
+}
 }

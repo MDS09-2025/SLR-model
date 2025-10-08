@@ -4,16 +4,152 @@
     <div class="flex flex-col items-center justify-center flex-1">
         
     <!-- Audio Player -->
-    <div class="w-[600px] mb-8">
-        <ng-container *ngIf="audioUrl; else noAudio">
-            <audio #audioPlayer [src]="audioUrl" controls 
-                class="w-full rounded-full shadow-lg bg-white">
-                <source [src]="audioUrl" type="audio/flac" />
-            </audio>
-        </ng-container>
-        <ng-template #noAudio>
-            <p class="text-gray-900 dark:text-gray-400 text-center">No audio file found. Please upload again.</p>
-        </ng-template>
+    <div class="w-[600px] mb-8 flex flex-col items-center space-y-3">
+        <audio #audioPlayer [src]="audioUrl" class="w-0 h-0 opacity-0 absolute"></audio>
+        <div
+            class="flex items-center w-full bg-white dark:bg-gray-800 rounded-full shadow-lg px-4 py-3"
+        >
+            <button
+                (click)="rewind()"
+                class="text-neutral-600 dark:text-white hover:opacity-80 mr-2"
+                title="Rewind 1s"
+                >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
+                    <path d="M7.712 4.818A1.5 1.5 0 0 1 10 6.095v2.972c.104-.13.234-.248.389-.343l6.323-3.906A1.5 1.5 0 0 1 19 6.095v7.81a1.5 1.5 0 0 1-2.288 1.276l-6.323-3.905a1.505 1.505 0 0 1-.389-.344v2.973a1.5 1.5 0 0 1-2.288 1.276l-6.323-3.905a1.5 1.5 0 0 1 0-2.552l6.323-3.906Z" />
+                </svg>
+            </button>
+            <button
+                (click)="togglePlay()"
+                class="text-neutral-600 dark:text-white text-xl hover:opacity-80 mx-1 flex items-center justify-center"
+                title="Play / Pause"
+            >
+                <ng-container *ngIf="!isPlaying">
+                <!-- ▶️ Play Icon -->
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    class="size-5"
+                >
+                    <path
+                    d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"
+                    />
+                </svg>
+                </ng-container>
+                <ng-container *ngIf="isPlaying">
+                <!-- ⏸ Pause Icon -->
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    class="size-5"
+                >
+                    <path
+                    d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5ZM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5Z"
+                    />
+                </svg>
+                </ng-container>
+            </button>
+            <button
+                (click)="forward()"
+                class="text-neutral-600 dark:text-white hover:opacity-80 ml-2 mr-2"
+                title="Rewind 10s"
+                >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
+                    <path d="M3.288 4.818A1.5 1.5 0 0 0 1 6.095v7.81a1.5 1.5 0 0 0 2.288 1.276l6.323-3.905c.155-.096.285-.213.389-.344v2.973a1.5 1.5 0 0 0 2.288 1.276l6.323-3.905a1.5 1.5 0 0 0 0-2.552l-6.323-3.906A1.5 1.5 0 0 0 10 6.095v2.972a1.506 1.506 0 0 0-.389-.343L3.288 4.818Z" />
+                </svg>
+            </button>
+            <span class="text-gray-700 dark:text-gray-200 text-sm whitespace-nowrap">
+                {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+            </span>
+            <input
+                #progressBar
+                type="range"
+                min="0"
+                max="100"
+                value="0"
+                class="flex-1 mx-3 appearance-none cursor-pointer
+                        bg-neutral-300 dark:bg-neutral-700 rounded-full h-[3px]
+                        [&::-webkit-slider-runnable-track]:h-[3px]
+                        [&::-webkit-slider-runnable-track]:rounded-full
+                        [&::-webkit-slider-runnable-track]:bg-transparent
+
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-[10px]
+                        [&::-webkit-slider-thumb]:h-[10px]
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-neutral-400
+                        dark:[&::-webkit-slider-thumb]:bg-white
+                        [&::-webkit-slider-thumb]:border
+                        [&::-webkit-slider-thumb]:border-neutral-400
+                        [&::-webkit-slider-thumb]:cursor-pointer
+                        [&::-webkit-slider-thumb]:mt-[-3.5px]   /* ✅ centers the thumb */
+
+                        [&::-moz-range-thumb]:w-[10px]
+                        [&::-moz-range-thumb]:h-[10px]
+                        [&::-moz-range-thumb]:rounded-full
+                        [&::-moz-range-thumb]:bg-white
+                        [&::-moz-range-thumb]:border
+                        [&::-moz-range-thumb]:border-neutral-400
+                        [&::-moz-range-thumb]:cursor-pointer
+                        [&::-moz-range-thumb]:translate-y-[-2px]   /* ✅ centers for Firefox */
+
+                        [&::-moz-range-track]:h-[3px]
+                        [&::-moz-range-track]:rounded-full
+                        [&::-moz-range-track]:bg-neutral-400
+                        dark:[&::-moz-range-track]:bg-neutral-600"
+                />
+                <!-- Playback speed control -->
+<div class="relative ml-3" (clickOutside)="showSpeedMenu = false">
+  <!-- Button -->
+  <button
+    (click)="toggleSpeedMenu()"
+    class="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+    title="Playback speed"
+  >
+    <!-- SVG icon -->
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 64 64"
+      class="w-6 h-6 text-[#1E2A5A] dark:text-[#B6C3FF]"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle
+        cx="32"
+        cy="32"
+        r="28"
+        stroke="currentColor"
+        stroke-width="4"
+        stroke-dasharray="100 40"
+        transform="rotate(-90 32 32)"
+      />
+      <polygon points="26,20 26,44 46,32" fill="currentColor" />
+    </svg>
+  </button>
+
+  <!-- Dropdown -->
+  <div
+    *ngIf="showSpeedMenu"
+    class="absolute top-10 left-1/2 -translate-x-1/2 
+       bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 
+       shadow-lg rounded-md py-1 w-20 border border-gray-200 dark:border-gray-700 
+       z-50 max-h-40 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+    <button
+      *ngFor="let rate of availableRates"
+      (click)="setPlaybackRate(rate); showSpeedMenu = false"
+      class="block w-full text-center text-sm px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition"
+      [class.bg-[#5271FF]]="playbackRate === rate"
+      [class.text-white]="playbackRate === rate"
+    >
+      {{ rate }}×
+    </button>
+  </div>
+</div>
+
+        </div>
     </div>
     
     <!-- Placeholder for Avatar Animation-->
