@@ -43,17 +43,23 @@ export class AudioTranslationPageComponent implements OnInit{
 
   ngOnInit(): void {
     console.log('[AudioTranslationPage] ngOnInit called');
-    this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
+    this.theme.isDarkMode$.subscribe(mode => (this.isDarkMode = mode));
+
     const stored = sessionStorage.getItem('media');
     console.log('[AudioTranslationPage] Stored media:', stored);
+
     if (stored) {
       const mediaData = JSON.parse(stored);
       console.log('[AudioTranslationPage] Parsed mediaData:', mediaData);
+
       if (mediaData.type === 'audio') {
-        this.audioUrl = 'http://localhost:5027' + mediaData.backend;// Use the backend URL for audio
+        this.audioUrl = 'http://localhost:5027' + mediaData.backend;
         console.log('Playing audio from backend:', this.audioUrl);
+
         this.gloss = mediaData.results?.gloss ?? null;
         this.jobId = mediaData.jobId;
+        this.fileName = mediaData.backend.split('/').pop() || null;
+
         if (this.jobId) {
           // 🕒 Load pose_timing.json
           this.translateService.getPoseTiming(this.jobId).subscribe(data => {
@@ -66,12 +72,38 @@ export class AudioTranslationPageComponent implements OnInit{
             this.transcripts = text.split('\n').map(t => t.trim()).filter(Boolean);
             console.log('[Subtitles] Loaded transcript:', this.transcripts);
           });
+
+          // 🎥 Load pose video and bind subtitles
+          this.translateService.getPoseVideo(this.jobId).subscribe(blob => {
+            this.poseUrl = URL.createObjectURL(blob);
+            console.log('[AudioTranslationPage] Pose video URL:', this.poseUrl);
+
+            setTimeout(() => {
+              const video = this.poseVideo?.nativeElement;
+              if (!video) return;
+
+              console.log('[SubtitleSync] Binding after video loaded');
+
+              video.addEventListener('timeupdate', () => {
+                const time = video.currentTime;
+                if (!this.poseTiming?.length || !this.transcripts?.length) return;
+
+                const seg = this.poseTiming.find(
+                  s => time + 0.1 >= s.start && time <= s.end + 0.1
+                );
+
+                this.ngZone.run(() => {
+                  this.currentSubtitle = seg
+                    ? this.transcripts[this.poseTiming.indexOf(seg)] || ''
+                    : '';
+                });
+
+                if (this.currentSubtitle)
+                  console.log('[Subtitle]', this.currentSubtitle);
+              });
+            }, 500);
+          });
         }
-        this.translateService.getPoseVideo(this.jobId!).subscribe(blob => {
-          this.poseUrl = URL.createObjectURL(blob);
-          console.log('[AudioTranslationPage] Pose video URL:', this.poseUrl);
-        });
-        this.fileName = mediaData.backend.split('/').pop(); 
       } else {
         console.warn('Stored media is not audio');
       }
@@ -154,20 +186,15 @@ export class AudioTranslationPageComponent implements OnInit{
 togglePlay() {
   const audio = this.audioPlayer?.nativeElement;
   const video = this.poseVideo?.nativeElement;
-  if (!audio) return;
+  if (!audio || !video) return;
 
   if (audio.paused) {
     audio.play();
-    if (video) {
-      video.currentTime = audio.currentTime; // keep synced
-      video.play().catch(() => {
-        console.warn('[PoseVideo] Autoplay blocked, waiting for user interaction.');
-      });
-    }
+    video.play().catch(err => console.warn('Autoplay blocked:', err));
     this.isPlaying = true;
   } else {
     audio.pause();
-    if (video) video.pause();
+    video.pause();
     this.isPlaying = false;
   }
 }
@@ -232,22 +259,6 @@ ngAfterViewInit() {
     audio.currentTime = seekTime;
     this.currentTime = seekTime;
   });
-
-  if (video) {
-    video.addEventListener('timeupdate', () => {
-      const time = video.currentTime;
-      const seg = this.poseTiming.find(s => time >= s.start && time < s.end);
-      if (seg) {
-        const idx = this.poseTiming.indexOf(seg);
-        const newSubtitle = this.transcripts[idx] || '';
-        if (this.currentSubtitle !== newSubtitle) {
-          this.currentSubtitle = newSubtitle;
-        }
-      } else {
-        this.currentSubtitle = '';
-      }
-    });
-  }
 }
 
 rewind(seconds: number = 1) {

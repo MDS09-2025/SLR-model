@@ -52,6 +52,6 @@ export class TranslateService {
 
   getTranscript(jobId: string) {
     // Fetch the cleaned transcript text file
-    return this.http.get(`http://localhost:5027/jobs/${jobId}/Transcripts/transcription_output.txt`, { responseType: 'text' });
+    return this.http.get(`http://localhost:5027/jobs/${jobId}/transcription_output.txt`, { responseType: 'text' });
   }
 }
