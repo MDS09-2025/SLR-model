@@ -211,7 +211,7 @@ namespace Talk2Hands.Backend.Controllers
             if (p.ExitCode != 0)
                 throw new Exception($"ffmpeg failed: {stderr}");
         }
-        
+
         [HttpGet("download/{jobId}/{fileName}")]
         public IActionResult Download(string jobId, string fileName)
         {
@@ -224,7 +224,7 @@ namespace Talk2Hands.Backend.Controllers
                 return NotFound();
 
             // Default MIME type
-            var mimeType = "application/octet-stream"; 
+            var mimeType = "application/octet-stream";
 
             // Audio types
             if (fileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
@@ -251,6 +251,5 @@ namespace Talk2Hands.Backend.Controllers
             // 👇 Always force download
             return PhysicalFile(filePath, mimeType, fileName);
         }
-
     }
 }

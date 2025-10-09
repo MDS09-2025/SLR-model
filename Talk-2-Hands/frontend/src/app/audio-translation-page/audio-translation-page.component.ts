@@ -34,6 +34,9 @@ export class AudioTranslationPageComponent implements OnInit{
   showSpeedMenu = false;
   playbackRate = 1.0;
   availableRates = [0.5, 1.0, 1.25, 1.5, 2.0];
+  poseTiming: any[] = [];
+  transcripts: string[] = [];
+  currentSubtitle: string = '';
 
   constructor(private mediacontent: MediaTransferService, private translateService: TranslateService, private theme: ThemeService, private ngZone: NgZone) { }
   // Injecting the MediaTransferService to access the selected media file
@@ -51,6 +54,19 @@ export class AudioTranslationPageComponent implements OnInit{
         console.log('Playing audio from backend:', this.audioUrl);
         this.gloss = mediaData.results?.gloss ?? null;
         this.jobId = mediaData.jobId;
+        if (this.jobId) {
+          // 🕒 Load pose_timing.json
+          this.translateService.getPoseTiming(this.jobId).subscribe(data => {
+            this.poseTiming = data;
+            console.log('[Subtitles] Loaded pose_timing.json:', data);
+          });
+
+          // 💬 Load transcript text
+          this.translateService.getTranscript(this.jobId).subscribe(text => {
+            this.transcripts = text.split('\n').map(t => t.trim()).filter(Boolean);
+            console.log('[Subtitles] Loaded transcript:', this.transcripts);
+          });
+        }
         this.translateService.getPoseVideo(this.jobId!).subscribe(blob => {
           this.poseUrl = URL.createObjectURL(blob);
           console.log('[AudioTranslationPage] Pose video URL:', this.poseUrl);
@@ -65,25 +81,37 @@ export class AudioTranslationPageComponent implements OnInit{
   }
 
   downloadAudio() {
-    if (this.jobId && this.fileName) {
-      this.translateService.downloadFile(this.jobId, this.fileName)
-        .subscribe(blob => {
-          // create download link from blob
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = this.fileName!; // keep original name
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url); // cleanup
+  if (this.jobId && this.fileName) {
+    const baseName = this.fileName.replace(/\.[^/.]+$/, ''); // remove extension
+
+    // 1️⃣ Download Audio
+    this.translateService.downloadFile(this.jobId, this.fileName)
+      .subscribe(audioBlob => {
+        const audioUrl = window.URL.createObjectURL(audioBlob);
+        const audioLink = document.createElement('a');
+        audioLink.href = audioUrl;
+        audioLink.download = `${baseName}_audio.wav`;
+        document.body.appendChild(audioLink);
+        audioLink.click();
+        document.body.removeChild(audioLink);
+        window.URL.revokeObjectURL(audioUrl);
+
+        // 2️⃣ Then download Pose Video (avatar)
+        this.translateService.getPoseVideo(this.jobId!).subscribe(videoBlob => {
+          const videoUrl = window.URL.createObjectURL(videoBlob);
+          const videoLink = document.createElement('a');
+          videoLink.href = videoUrl;
+          videoLink.download = `${baseName}_avatar.mp4`;
+          document.body.appendChild(videoLink);
+          videoLink.click();
+          document.body.removeChild(videoLink);
+          window.URL.revokeObjectURL(videoUrl);
         });
-    } else {
-      console.warn('No audio/video available to download');
-    }
+      });
+  } else {
+    console.warn('No audio/video available to download');
   }
-
-
+}
   ngAfterViewChecked(): void {
   if (this.audioPlayer && !this.bound) {
     const audio = this.audioPlayer.nativeElement;
@@ -204,6 +232,22 @@ ngAfterViewInit() {
     audio.currentTime = seekTime;
     this.currentTime = seekTime;
   });
+
+  if (video) {
+    video.addEventListener('timeupdate', () => {
+      const time = video.currentTime;
+      const seg = this.poseTiming.find(s => time >= s.start && time < s.end);
+      if (seg) {
+        const idx = this.poseTiming.indexOf(seg);
+        const newSubtitle = this.transcripts[idx] || '';
+        if (this.currentSubtitle !== newSubtitle) {
+          this.currentSubtitle = newSubtitle;
+        }
+      } else {
+        this.currentSubtitle = '';
+      }
+    });
+  }
 }
 
 rewind(seconds: number = 1) {

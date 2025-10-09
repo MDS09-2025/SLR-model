@@ -45,4 +45,13 @@ export class TranslateService {
     });
   }
 
+  getPoseTiming(jobId: string) {
+    // Fetch the timing JSON that lists gloss start/end/duration
+    return this.http.get<any[]>(`http://localhost:5027/jobs/${jobId}/Pose_Output/pose_timing.json`);
+  }
+
+  getTranscript(jobId: string) {
+    // Fetch the cleaned transcript text file
+    return this.http.get(`http://localhost:5027/jobs/${jobId}/Transcripts/transcription_output.txt`, { responseType: 'text' });
+  }
 }

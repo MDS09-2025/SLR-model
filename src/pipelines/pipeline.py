@@ -27,6 +27,8 @@ from faster_whisper import WhisperModel
 from gloss2pose import PoseLookup, scale_down, prepare_glosses
 from pose_format.pose_visualizer import PoseVisualizer
 import base64, cv2, subprocess
+from pose_format import Pose
+import json, os
 
 # ---------------------------
 # Utility: ensure dir clean
@@ -749,6 +751,91 @@ def pad_audio_to_pose(audio_in, out_audio, target_frames, fps):
     print(f"[INFO] Padded audio → {out_audio} ({target_duration:.2f}s)")
     return out_audio
 
+def trim_trailing_empty_frames(pose):
+    """
+    Remove only trailing frames that contain no keypoints (all zeros),
+    while keeping valid frames earlier in the sequence.
+    """
+    data = pose.body.data
+    ndim = data.ndim
+
+    if ndim == 3:
+        mask = (data != 0).any(axis=(1, 2))
+    elif ndim == 4:
+        mask = (data != 0).any(axis=(1, 2, 3))
+    else:
+        print(f"⚠️ Unexpected pose shape {data.shape}, skipping trim")
+        return pose
+
+    # find last non-zero frame
+    if mask.any():
+        last_nonzero = np.where(mask)[0][-1] + 1
+        pose.body.data = data[:last_nonzero]
+        pose.body.confidence = pose.body.confidence[:last_nonzero]
+    return pose
+
+def smooth_transition(prev_pose, next_pose, blend_frames=8):
+    """
+    Blend last N frames of prev_pose with first N frames of next_pose
+    for smoother visual transition. Works for 3D (F,P,C) and 4D (F,N,P,C).
+    """
+    prev_data = prev_pose.body.data
+    next_data = next_pose.body.data
+    prev_conf = prev_pose.body.confidence
+    next_conf = next_pose.body.confidence
+
+    # If either sequence is too short, just concatenate
+    if prev_data.shape[0] < blend_frames or next_data.shape[0] < blend_frames:
+        prev_pose.body.data = np.concatenate([prev_data, next_data], axis=0)
+        prev_pose.body.confidence = np.concatenate([prev_conf, next_conf], axis=0)
+        return prev_pose
+
+    # ---- Align ranks (insert a singleton "persons" axis if missing) ----
+    # Data: (F,P,C) -> add persons axis to become (F,1,P,C)
+    if prev_data.ndim == 3 and next_data.ndim == 4:
+        prev_data = np.expand_dims(prev_data, axis=1)
+        prev_conf = np.expand_dims(prev_conf, axis=1)  # (F,P) -> (F,1,P)
+    elif prev_data.ndim == 4 and next_data.ndim == 3:
+        next_data = np.expand_dims(next_data, axis=1)
+        next_conf = np.expand_dims(next_conf, axis=1)  # (F,P) -> (F,1,P)
+
+    # Re-slice tails/heads after alignment
+    tail_prev = prev_data[-blend_frames:]
+    head_next = next_data[:blend_frames]
+    tail_conf = prev_conf[-blend_frames:]
+    head_conf = next_conf[:blend_frames]
+
+    # ---- Alpha with matching ndim ----
+    # alpha shape: (blend_frames, 1, 1, 1) for 4D or (blend_frames, 1, 1) for 3D
+    nd = tail_prev.ndim
+    alpha = np.linspace(0.0, 1.0, blend_frames, dtype=tail_prev.dtype).reshape(
+        (blend_frames,) + (1,) * (nd - 1)
+    )
+
+    # ---- Blend ----
+    blended_mid = (1 - alpha) * tail_prev + alpha * head_next
+    blended_conf = (1 - alpha[..., 0]) * tail_conf + alpha[..., 0] * head_conf \
+        if tail_conf.ndim == blended_mid.ndim - 1 else \
+        (1 - alpha.squeeze()) * tail_conf + alpha.squeeze() * head_conf
+
+    # ---- Concatenate along frames ----
+    new_data = np.concatenate(
+        [prev_data[:-blend_frames], blended_mid, next_data[blend_frames:]], axis=0
+    )
+    new_conf = np.concatenate(
+        [prev_conf[:-blend_frames], blended_conf, next_conf[blend_frames:]], axis=0
+    )
+
+    # If we added a persons axis earlier and original poses were 3D,
+    # drop it back to 3D for consistency.
+    if prev_pose.body.data.ndim == 3 and new_data.ndim == 4 and new_data.shape[1] == 1:
+        new_data = np.squeeze(new_data, axis=1)
+        new_conf = np.squeeze(new_conf, axis=1)
+
+    prev_pose.body.data = new_data
+    prev_pose.body.confidence = new_conf
+    return prev_pose
+
 
 # ---------------------------
 # CLI
@@ -832,6 +919,20 @@ def main():
     if args.translate:
         print("\n--- Step 3: Parallel Text-to-Gloss Translation ---")
         device = pick_device(force_cpu=args.t2g_cpu)
+        # --- ✨ Preprocess transcription to sentence-level ---
+        if os.path.exists(args.transcript_txt):
+            with open(args.transcript_txt, "r") as f:
+                raw_text = f.read().strip()
+
+            # Split on .!? or comma + space
+            sentences = re.split(r'(?<=[.!?])\s+|,\s+', raw_text)
+            sentences = [s.strip() for s in sentences if s.strip()]
+
+            # Overwrite transcription file to use sentence-per-line
+            with open(args.transcript_txt, "w") as f:
+                f.write("\n".join(sentences))
+            print(f"[INFO] Cleaned transcription into {len(sentences)} sentences")
+        # ------------------------------------------------------
         translate_file_parallel(
                 model_dir=args.t2g_model,
                 device=device,
@@ -850,104 +951,122 @@ def main():
     if args.render_pose:
         os.makedirs(args.pose_dir, exist_ok=True)
         lookup = PoseLookup(directory=args.gloss2pose_dir, language="asl")
+
         with open(args.gloss_txt, "r") as f:
+            print(f"[DEBUG] Using gloss file: {os.path.abspath(args.gloss_txt)}")
             lines = [ln.strip() for ln in f if ln.strip()]
 
+        all_poses = []       # to concatenate all gloss poses
+        pose_timing = []     # timing metadata
+        accum_time = 0.0     # running timeline position
+
+        # --- Loop through each gloss line ---
         for i, gloss_line in enumerate(lines, start=1):
             glosses = prepare_glosses(gloss_line)
             pose, words = lookup.gloss_to_pose(glosses)
 
-            if pose:
-                pose = trim_empty_frames(pose)
-                pose = trim_leading_static_frames(pose)
-                if pose.body.data.shape[0] == 0:
-                    print(f"⚠️ Empty pose skipped for line {i}")
-                    continue
-                scale_down(pose, 512)
-                p = PoseVisualizer(pose, thickness=2)
-
-                if hasattr(args, "input_video") and args.input_video and os.path.exists(args.input_video):
-                    # shrink skeleton only (video unaffected)
-                    pose = shrink_pose_only(pose, factor=0.5)
-                    pose = shift_pose(pose, dx=300, dy=300)
-
-                    video_fps = get_video_fps(args.input_video)
-                    pose_fps = getattr(pose.body, "fps", video_fps or 25)
-                    if video_fps:
-                        video_cap = cv2.VideoCapture(args.input_video)
-                        video_frames = int(video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                        video_cap.release()
-                        pose = resample_pose_manual(pose, int(round(video_fps)))
-
-                        pose_frames = pose.body.data.shape[0]
-                        if pose_frames > video_frames:
-                            extended_video = os.path.join(args.pose_dir, f"{args.job_id}_extended.mp4")
-                            extend_video_to_match_pose(args.input_video, extended_video, pose_frames, int(video_fps))
-                            input_video_for_overlay = extended_video
-                        else:
-                            # extend pose
-                            pose = extend_pose_to_match_video(pose, video_frames)
-                            input_video_for_overlay = args.input_video
-                        
-                        
-                        p = PoseVisualizer(pose, thickness=2)
-
-                        out_path = os.path.join(args.pose_dir, f"{args.job_id}_overlay.mp4")
-                        p.save_video(out_path, p.draw_on_video(input_video_for_overlay))
-                        print(f"[INFO] Overlay video saved → {out_path}")
-
-                        # Merge back audio from original video
-                        final_path = out_path.replace("_overlay", "_final")
-                        video_base = os.path.splitext(os.path.basename(args.input_video))[0]
-                        possible_exts = [".wav", ".mp3", ".flac", ".m4a"]
-
-                        audio_source = None
-
-                        for ext in possible_exts:
-                            candidate = os.path.join(args.raw_dir, f"{video_base}{ext}")
-                            if os.path.exists(candidate):
-                                audio_source = candidate
-                                break
-
-                        # 2. Fallback: use input video’s audio
-                        if audio_source is None:
-                            print("⚠️ No matching raw audio found, falling back to input video audio")
-                            audio_source = args.input_video
-                        job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))  # one level up from Pose_Output
-
-                        # Merge into final video
-                        final_path = os.path.join(job_root, f"{args.job_id}.mp4")
-                        merge_audio(audio_source, out_path, final_path, pad_to_duration=pose_frames/pose_fps)
-                        
-                else:
-                    pose_frames = pose.body.data.shape[0]
-                    pose_fps = getattr(pose.body, "fps", 25)
-                    p.save_video(f"{args.job_id}.mp4", p.draw())
-                    base_audio = None
-                    for f in os.listdir(args.raw_dir):
-                        if f.lower().endswith((".wav", ".mp3", ".flac", ".m4a")):
-                            base_audio = os.path.join(args.raw_dir, f)
-                            print(f"[INFO] Using fallback audio: {base_audio}")
-                            break
-                    if os.path.exists(base_audio):
-                        padded_audio = os.path.join(args.pose_dir, f"{args.job_id}_padded.wav")
-                        pad_audio_to_pose(base_audio, padded_audio, pose_frames, pose_fps)
-                        # Move padded audio to job root so ASP.NET can serve it
-                        job_root = os.path.dirname(os.path.dirname(padded_audio))  # one level up
-                        final_audio = os.path.join(job_root, f"{args.job_id}.wav")
-                        os.replace(padded_audio, final_audio)
-                        print(f"[INFO] Moved padded audio to {final_audio}")
-                    else:
-                        print("⚠️ No audio file found to pad")
-
-
-                pose_filename = f"{args.job_id}.pose" if args.job_id else f"pose_{i:03d}.pose"
-                out_pose = os.path.join(args.pose_dir, pose_filename)
-                with open(out_pose, "wb") as f:
-                    pose.write(f) # serialize pose to bytes
-                print(f"💾 Saved pose file: {out_pose}")
-            else:
+            if not pose:
                 print(f"⚠️ No pose found for line {i}: {gloss_line}")
+                continue
+
+            pose = trim_empty_frames(pose)
+            pose = trim_leading_static_frames(pose)
+            if pose.body.data.shape[0] == 0:
+                print(f"⚠️ Empty pose skipped for line {i}")
+                continue
+
+            scale_down(pose, 512)
+            pose_fps = getattr(pose.body, "fps", 25)
+            pose_frames = pose.body.data.shape[0]
+            pose_duration = pose_frames / pose_fps
+
+            pose_timing.append({
+                "gloss": gloss_line,
+                "start": round(accum_time, 2),
+                "end": round(accum_time + pose_duration, 2),
+                "duration": round(pose_duration, 2)
+            })
+            accum_time += pose_duration
+            all_poses.append(pose)
+
+        # --- Combine all poses AFTER loop ---
+        if all_poses:
+            base_pose = all_poses[0]
+            for next_pose in all_poses[1:]:
+                base_pose = smooth_transition(base_pose, next_pose, blend_frames=8)
+
+            combined_pose_path = os.path.join(args.pose_dir, f"{args.job_id}.pose")
+            with open(combined_pose_path, "wb") as f:
+                base_pose.write(f)
+            print(f"💾 Saved combined pose → {combined_pose_path}")
+            base_pose = trim_trailing_empty_frames(base_pose)
+            vis = PoseVisualizer(base_pose, thickness=2)
+            # Save combined video inside pose_dir first (temporary)
+            temp_video_path = os.path.join(args.pose_dir, f"{args.job_id}.mp4")
+            vis.save_video(temp_video_path, vis.draw())
+            print(f"🎬 Saved combined video → {temp_video_path}")
+
+            # --- ✂️ Trim video duration based on pose_timing ---
+            if pose_timing:
+                end_time = pose_timing[-1]["end"]  # last gloss end time, e.g. 12.3
+                trim_duration = round(end_time + 0.7, 2)  # add ~0.7s buffer
+                trimmed_video_path = os.path.join(args.pose_dir, f"{args.job_id}_trimmed.mp4")
+
+                try:
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", temp_video_path,
+                        "-t", str(trim_duration),
+                        "-c", "copy",
+                        trimmed_video_path
+                    ], check=True)
+                    print(f"✂️ Trimmed video to {trim_duration}s → {trimmed_video_path}")
+                    # replace reference so next steps use trimmed file
+                    temp_video_path = trimmed_video_path
+                except Exception as e:
+                    print(f"⚠️ Video trim failed: {e}")
+            else:
+                print("⚠️ No pose_timing found — skipping trim")
+
+
+            pose_frames = base_pose.body.data.shape[0]
+            pose_fps = getattr(base_pose.body, "fps", 25)
+            base_audio = None
+            for f in os.listdir(args.raw_dir):
+                if f.lower().endswith((".wav", ".mp3", ".flac", ".m4a")):
+                    base_audio = os.path.join(args.raw_dir, f)
+                    print(f"[INFO] Using fallback audio: {base_audio}")
+                    break
+
+            if base_audio:
+                padded_audio = os.path.join(args.pose_dir, f"{args.job_id}_padded.wav")
+                # Match padded audio to trimmed duration if available
+                if pose_timing:
+                    pad_audio_to_pose(base_audio, padded_audio, int(trim_duration * pose_fps), pose_fps)
+                else:
+                    pad_audio_to_pose(base_audio, padded_audio, pose_frames, pose_fps)
+                # Move padded audio to job root for ASP.NET access
+                job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
+                final_audio = os.path.join(job_root, f"{args.job_id}.wav")
+                os.replace(padded_audio, final_audio)
+                print(f"🎧 Moved padded audio to root directory → {final_audio}")
+            else:
+                print("⚠️ No audio file found to pad")
+
+            # Move combined video to root directory for frontend access
+            job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
+            final_video_path = os.path.join(job_root, f"{args.job_id}.mp4")
+            os.replace(temp_video_path, final_video_path)
+            print(f"📦 Moved final video to root directory → {final_video_path}")
+        else:
+            print("⚠️ No valid poses found — skipping render.")
+
+        # --- Save pose timing metadata ---
+        timing_json = os.path.join(args.pose_dir, "pose_timing.json")
+        with open(timing_json, "w") as f:
+            json.dump(pose_timing, f, indent=2)
+        print(f"🕒 Saved pose timing metadata → {timing_json}")
+
 
 if __name__ == "__main__":
     # Set multiprocessing start method for cross-platform compatibility
