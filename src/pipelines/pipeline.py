@@ -846,22 +846,27 @@ def cut_last_second(video_path):
             capture_output=True, text=True, check=True
         )
         duration = float(probe.stdout.strip())
-        new_duration = max(0, duration - 1.0)  # cut last second safely
-        trimmed_path = video_path.replace(".mp4", "_cut.mp4")
+        new_duration = max(0, duration - 1.0)
+
+        # Write to temporary file first
+        temp_trimmed = video_path + ".tmp.mp4"
 
         subprocess.run([
             "ffmpeg", "-y",
             "-i", video_path,
             "-t", str(new_duration),
-            "-c", "copy", trimmed_path
+            "-c", "copy",
+            temp_trimmed
         ], check=True)
 
-        print(f"✂️ Trimmed last 1s ({new_duration:.2f}s total) → {trimmed_path}")
-        return trimmed_path
+        # Replace original atomically
+        os.replace(temp_trimmed, video_path)
+
+        print(f"✂️ Trimmed last 1s ({new_duration:.2f}s total) → {video_path}")
+        return video_path
     except Exception as e:
         print(f"⚠️ Failed to cut last second: {e}")
         return video_path
-
 
 # ---------------------------
 # CLI
@@ -1093,7 +1098,6 @@ def main():
             job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
             final_video_path = os.path.join(job_root, f"{args.job_id}.mp4")
             os.replace(temp_video_path, final_video_path)
-            final_video_path = cut_last_second(final_video_path)
             print(f"📦 Moved final video to root directory → {final_video_path}")
             # --- 🎥 Overlay avatar on input video (if provided) ---
             # --- Overlay on input video (fixed) ---
@@ -1155,7 +1159,7 @@ def main():
                 final_path = os.path.join(job_root, f"{args.job_id}.mp4")
                 audio_pad_seconds = pose_frames / float(pose_fps)
                 merge_audio(audio_source, out_path, final_path, pad_to_duration=audio_pad_seconds)
-
+                final_path = cut_last_second(final_path)
                 # --- Save pose timing metadata ---
                 timing_json = os.path.join(args.pose_dir, "pose_timing.json")
                 with open(timing_json, "w") as f:

@@ -243,6 +243,8 @@ def prepare_glosses(sentence: str) -> List[str]:
         else:
             # if gloss has a hyphen, keep only the part after the last hyphen
             cleaned = word.split("-")[-1]
+            if cleaned == "hi":
+                cleaned = "hello"
             if cleaned in drop_words:
                 print(f"[DEBUG] Dropping word after hyphen split: '{cleaned}'")
                 continue
