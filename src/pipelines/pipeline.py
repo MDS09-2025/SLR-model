@@ -836,6 +836,32 @@ def smooth_transition(prev_pose, next_pose, blend_frames=8):
     prev_pose.body.confidence = new_conf
     return prev_pose
 
+# --- ✂️ Cut last 1 second of the final video ---
+def cut_last_second(video_path):
+    try:
+        # Get duration
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+            capture_output=True, text=True, check=True
+        )
+        duration = float(probe.stdout.strip())
+        new_duration = max(0, duration - 1.0)  # cut last second safely
+        trimmed_path = video_path.replace(".mp4", "_cut.mp4")
+
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-t", str(new_duration),
+            "-c", "copy", trimmed_path
+        ], check=True)
+
+        print(f"✂️ Trimmed last 1s ({new_duration:.2f}s total) → {trimmed_path}")
+        return trimmed_path
+    except Exception as e:
+        print(f"⚠️ Failed to cut last second: {e}")
+        return video_path
+
 
 # ---------------------------
 # CLI
@@ -1007,26 +1033,27 @@ def main():
             print(f"🎬 Saved combined video → {temp_video_path}")
 
             # --- ✂️ Trim video duration based on pose_timing ---
-            if pose_timing:
-                end_time = pose_timing[-1]["end"]  # last gloss end time, e.g. 12.3
-                trim_duration = round(end_time + 0.7, 2)  # add ~0.7s buffer
-                trimmed_video_path = os.path.join(args.pose_dir, f"{args.job_id}_trimmed.mp4")
+            if not args.input_video: 
+                if pose_timing:
+                    end_time = pose_timing[-1]["end"]  # last gloss end time, e.g. 12.3
+                    trim_duration = round(end_time + 0.7, 2)  # add ~0.7s buffer
+                    trimmed_video_path = os.path.join(args.pose_dir, f"{args.job_id}_trimmed.mp4")
 
-                try:
-                    subprocess.run([
-                        "ffmpeg", "-y",
-                        "-i", temp_video_path,
-                        "-t", str(trim_duration),
-                        "-c", "copy",
-                        trimmed_video_path
-                    ], check=True)
-                    print(f"✂️ Trimmed video to {trim_duration}s → {trimmed_video_path}")
-                    # replace reference so next steps use trimmed file
-                    temp_video_path = trimmed_video_path
-                except Exception as e:
-                    print(f"⚠️ Video trim failed: {e}")
-            else:
-                print("⚠️ No pose_timing found — skipping trim")
+                    try:
+                        subprocess.run([
+                            "ffmpeg", "-y",
+                            "-i", temp_video_path,
+                            "-t", str(trim_duration),
+                            "-c", "copy",
+                            trimmed_video_path
+                        ], check=True)
+                        print(f"✂️ Trimmed video to {trim_duration}s → {trimmed_video_path}")
+                        # replace reference so next steps use trimmed file
+                        temp_video_path = trimmed_video_path
+                    except Exception as e:
+                        print(f"⚠️ Video trim failed: {e}")
+                else:
+                    print("⚠️ No pose_timing found — skipping trim")
 
 
             pose_frames = base_pose.body.data.shape[0]
@@ -1040,11 +1067,19 @@ def main():
 
             if base_audio:
                 padded_audio = os.path.join(args.pose_dir, f"{args.job_id}_padded.wav")
-                # Match padded audio to trimmed duration if available
-                if pose_timing:
-                    pad_audio_to_pose(base_audio, padded_audio, int(trim_duration * pose_fps), pose_fps)
+
+                # --- Determine padding duration ---
+                if 'trim_duration' in locals():  # defined in non-overlay case
+                    target_frames = int(trim_duration * pose_fps)
+                    print(f"[AUDIO PAD] Using trim_duration={trim_duration}s")
                 else:
-                    pad_audio_to_pose(base_audio, padded_audio, pose_frames, pose_fps)
+                    # Overlay mode: use full pose duration
+                    target_frames = pose_frames
+                    print(f"[AUDIO PAD] Using full pose duration ({pose_frames / pose_fps:.2f}s)")
+
+                # --- Pad audio accordingly ---
+                pad_audio_to_pose(base_audio, padded_audio, target_frames, pose_fps)
+
                 # Move padded audio to job root for ASP.NET access
                 job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
                 final_audio = os.path.join(job_root, f"{args.job_id}.wav")
@@ -1053,19 +1088,79 @@ def main():
             else:
                 print("⚠️ No audio file found to pad")
 
+
             # Move combined video to root directory for frontend access
             job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
             final_video_path = os.path.join(job_root, f"{args.job_id}.mp4")
             os.replace(temp_video_path, final_video_path)
+            final_video_path = cut_last_second(final_video_path)
             print(f"📦 Moved final video to root directory → {final_video_path}")
-        else:
-            print("⚠️ No valid poses found — skipping render.")
+            # --- 🎥 Overlay avatar on input video (if provided) ---
+            # --- Overlay on input video (fixed) ---
+            if args.input_video and os.path.exists(args.input_video):
+                print(f"[INFO] Overlay mode: compositing pose on top of {args.input_video}")
 
-        # --- Save pose timing metadata ---
-        timing_json = os.path.join(args.pose_dir, "pose_timing.json")
-        with open(timing_json, "w") as f:
-            json.dump(pose_timing, f, indent=2)
-        print(f"🕒 Saved pose timing metadata → {timing_json}")
+                base_pose = shrink_pose_only(base_pose, factor=0.5)
+                base_pose = shift_pose(base_pose, dx=300, dy=300)
+
+                video_fps = get_video_fps(args.input_video)
+                if video_fps:
+                    pose = resample_pose_manual(base_pose, int(round(video_fps)))
+                    pose_fps = int(round(video_fps))
+                else:
+                    pose = base_pose
+                    pose_fps = getattr(pose.body, "fps", 25)
+
+                video_cap = cv2.VideoCapture(args.input_video)
+                video_frames = int(video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                video_cap.release()
+
+                pose_frames = pose.body.data.shape[0]
+                pose_duration = pose_frames / float(pose_fps)
+                video_duration = video_frames / float(video_fps) if video_fps else None
+
+                print(f"[DEBUG] Pose frames={pose_frames} ({pose_duration:.2f}s), "
+                    f"Video frames={video_frames} ({video_duration:.2f}s)")
+
+                if pose_frames > video_frames + 2:
+                    print("[INFO] Pose longer → extending input video to match avatar duration")
+                    extended_video = os.path.join(args.pose_dir, f"{args.job_id}_extended.mp4")
+                    extend_video_to_match_pose(args.input_video, extended_video, pose_frames, float(video_fps))
+                    input_video_for_overlay = extended_video
+                else:
+                    print("[INFO] Input video longer → extending pose instead")
+                    pose = extend_pose_to_match_video(pose, video_frames)
+                    pose_frames = pose.body.data.shape[0]  # update
+                    input_video_for_overlay = args.input_video
+
+                p = PoseVisualizer(pose, thickness=2)
+                out_path = os.path.join(args.pose_dir, f"{args.job_id}_overlay.mp4")
+                p.save_video(out_path, p.draw_on_video(input_video_for_overlay))
+                print(f"[INFO] Overlay video saved → {out_path}")
+
+                # select audio and merge
+                video_base = os.path.splitext(os.path.basename(args.input_video))[0]
+                possible_exts = [".wav", ".mp3", ".flac", ".m4a"]
+                audio_source = None
+                for ext in possible_exts:
+                    candidate = os.path.join(args.raw_dir, f"{video_base}{ext}")
+                    if os.path.exists(candidate):
+                        audio_source = candidate
+                        break
+                if audio_source is None:
+                    print("⚠️ No matching raw audio found, falling back to input video audio")
+                    audio_source = args.input_video
+
+                job_root = os.path.abspath(os.path.join(args.pose_dir, ".."))
+                final_path = os.path.join(job_root, f"{args.job_id}.mp4")
+                audio_pad_seconds = pose_frames / float(pose_fps)
+                merge_audio(audio_source, out_path, final_path, pad_to_duration=audio_pad_seconds)
+
+                # --- Save pose timing metadata ---
+                timing_json = os.path.join(args.pose_dir, "pose_timing.json")
+                with open(timing_json, "w") as f:
+                    json.dump(pose_timing, f, indent=2)
+                print(f"🕒 Saved pose timing metadata → {timing_json}")
 
 
 if __name__ == "__main__":

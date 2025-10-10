@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild, NgZone, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavBarComponent } from '../nav-bar/nav-bar.component';
 import { MediaTransferService } from '../services/media-transfer.service';
@@ -11,7 +11,7 @@ import { ThemeService } from '../services/theme.service';
   imports: [CommonModule, NavBarComponent],
   templateUrl: './video-translation-page.component.html'
 })
-export class VideoTranslationPageComponent {
+export class VideoTranslationPageComponent implements OnInit {
   videoSrc: string | null = null;
   localFile?: File;
   // Temporary display gloss
@@ -19,14 +19,19 @@ export class VideoTranslationPageComponent {
   jobId: string | null = null;
   fileName: string | null = null;
   isDarkMode = false;
+  poseTiming: any[] = [];
+  transcripts: string[] = [];
+  currentSubtitle: string = '';
+
 
   @ViewChild('player') playerRef?: ElementRef<HTMLVideoElement>;  // ✅ reference to <video>
   
-  constructor(private mediaService: MediaTransferService, private translateService: TranslateService, private theme: ThemeService){}
+  constructor(private mediaService: MediaTransferService, private translateService: TranslateService, private theme: ThemeService, private ngZone: NgZone){}
 
   ngOnInit(): void {
     console.log('[VideoTranslationPage] ngOnInit called');
     this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
+    
     const stored = sessionStorage.getItem('media');
     console.log('[VideoTranslationPage] Stored media:', stored);
 
@@ -40,6 +45,38 @@ export class VideoTranslationPageComponent {
         console.log('Playing video from backend:', this.videoSrc);
         this.jobId = mediaData.jobId;
         this.fileName = mediaData.backend.split('/').pop(); 
+        if (this.jobId) {
+          this.translateService.getPoseTiming(this.jobId).subscribe(data => {
+            this.poseTiming = data;
+            console.log('[Subtitles] Loaded pose_timing.json:', data);
+          });
+
+          this.translateService.getTranscript(this.jobId).subscribe(text => {
+            this.transcripts = text.split('\n').map(t => t.trim()).filter(Boolean);
+            console.log('[Subtitles] Loaded transcript:', this.transcripts);
+          });
+
+          // 🧠 Bind timeupdate after video loads
+          setTimeout(() => {
+            const video = this.playerRef?.nativeElement;
+            if (!video) return;
+            console.log('[SubtitleSync] Binding after video loaded');
+
+            video.addEventListener('timeupdate', () => {
+              const time = video.currentTime;
+              if (!this.poseTiming?.length || !this.transcripts?.length) return;
+
+              const seg = this.poseTiming.find(s => time + 0.1 >= s.start && time <= s.end + 0.1);
+              this.ngZone.run(() => {
+                  this.currentSubtitle = seg
+                    ? this.transcripts[this.poseTiming.indexOf(seg)] || ''
+                    : '';
+                });
+              if (this.currentSubtitle)
+                  console.log('[Subtitle]', this.currentSubtitle);
+            });
+          }, 500);
+        }
       } else {
         console.warn('Stored media is not video');
       }
