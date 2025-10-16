@@ -88,24 +88,25 @@ export class MainPageComponent {
       return;
     }
 
+    console.log('Before YouTube condition');
     if (this.mediaLink.trim()) {
-      this.translateService.sendYoutube(this.mediaLink.trim()).subscribe({
-        next: (res: any) => {
-          console.log('Backend YouTube response:', res);
-
-          const mediaData = {
-            ...res, 
-            type: 'video' // ensure it's flagged as video
-          };
-          sessionStorage.setItem('media', JSON.stringify(mediaData));
-          this.router.navigate(['/loading']);
-        },
-        error: (err) => console.error('Error sending YouTube link:', err)
-      });
+      console.log('YouTube branch entered');
+      try {
+        console.log('Attempting to call sendYoutube...');
+        this.translateService.sendYoutube(this.mediaLink.trim()).subscribe({
+          next: (res: any) => {
+            console.log('Backend YouTube response:', res);
+            const mediaData = { ...res, type: 'video' };
+            sessionStorage.setItem('media', JSON.stringify(mediaData));
+            this.router.navigate(['/loading']);
+          },
+          error: (err) => console.error('Error sending YouTube link:', err)
+        });
+      } catch (err) {
+        console.error('Error before subscribe:', err);
+      }
       return;
     }
-
-
     // Nothing provided
     console.warn('Please paste a link or upload a file.');
   }

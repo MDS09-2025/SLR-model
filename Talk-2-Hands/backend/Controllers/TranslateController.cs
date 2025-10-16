@@ -101,76 +101,103 @@ namespace Talk2Hands.Backend.Controllers
         [HttpPost("youtube")]
         public async Task<IActionResult> Youtube([FromBody] YoutubeReq body)
         {
+            Console.WriteLine(">>> [YouTube API] Endpoint hit");
             if (string.IsNullOrWhiteSpace(body?.Url))
                 return BadRequest("Missing url");
 
+            Console.WriteLine($">>> [YouTube API] Received URL: {body.Url}");
             var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
             var jobsRoot = Path.Combine(webRoot, "jobs");
             Directory.CreateDirectory(jobsRoot);
+            
             var jobId = Guid.NewGuid().ToString("N");
             var jobWork = Path.Combine(jobsRoot, jobId);
             Directory.CreateDirectory(jobWork);
             
+            Console.WriteLine($">>> [YouTube API] Job folder created: {jobWork}");
 
             // Step 1: pick a predictable safe filename
             var safeName = $"youtube_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.mp4";
             var videoPath = Path.Combine(jobWork, safeName);
 
-            // Step 2: run yt-dlp with that as output target
-            var psi = new ProcessStartInfo
-            {
-                FileName = "yt-dlp",
-                ArgumentList = {
-                    "-f", "bv+ba/best",                 // best video + best audio
-                    "--merge-output-format", "mp4",     // always mp4
-                    "-o", videoPath,                    // output path
-                    body.Url
-                },
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false
-            };
-
-            var proc = Process.Start(psi)!;
-            string stderr = await proc.StandardError.ReadToEndAsync();
-            string stdout = await proc.StandardOutput.ReadToEndAsync();
-            await proc.WaitForExitAsync();
-
-            if (proc.ExitCode != 0 || !System.IO.File.Exists(videoPath))
-                throw new Exception($"yt-dlp failed. stderr={stderr}");
-
-            Console.WriteLine($"[YouTube] Downloaded {videoPath}, length={new FileInfo(videoPath).Length} bytes");
-
-            // Step 3: extract audio into Raw_Audio
-            var rawDir = Path.Combine(jobWork, "Raw_Audio");
-            Directory.CreateDirectory(rawDir);
-            var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
-
-            await RunFfmpeg(videoPath, wavOut);
-
-            // Step 4: register + enqueue pipeline job
             var job = new PipelineJob
             {
-                JobId = jobId,               
+                JobId = jobId,
                 SourceType = "youtube",
                 WorkDir = jobWork,
-                PublicBase = $"/jobs/{jobId}"
+                PublicBase = $"/jobs/{jobId}",
+                Status = JobState.Queued
             };
+            
             _store.Add(job);
-            await _queue.EnqueueAsync(job);
 
-            // Step 5: return response Angular expects
-            return Ok(new
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    job.Status = JobState.Running;
+                    Console.WriteLine($">>> [YouTube API] [Job:{jobId}] Starting yt-dlp...");
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "yt-dlp",
+                        ArgumentList = {
+                            "--no-playlist",
+                            "-f", "best[height<=720]",
+                            "--merge-output-format", "mp4",
+                            "-o", videoPath,
+                            body.Url
+                        },
+                        RedirectStandardError = true,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false
+                    };
+
+                    using var proc = Process.Start(psi)!;
+                    string stderr = await proc.StandardError.ReadToEndAsync();
+                    string stdout = await proc.StandardOutput.ReadToEndAsync();
+                    await proc.WaitForExitAsync();
+
+                    if (proc.ExitCode != 0 || !System.IO.File.Exists(videoPath))
+                    {
+                        Console.WriteLine($">>> [YouTube API] [Job:{jobId}] yt-dlp failed: {stderr}");
+                        job.Status = JobState.Failed;
+                        job.Error = "YouTube download failed.";
+                        return;
+                    }
+
+                    Console.WriteLine($">>> [YouTube API] [Job:{jobId}] Download complete: {videoPath}");
+
+                    var rawDir = Path.Combine(jobWork, "Raw_Audio");
+                    Directory.CreateDirectory(rawDir);
+                    var wavOut = Path.Combine(rawDir, Path.GetFileNameWithoutExtension(safeName) + ".wav");
+
+                    await RunFfmpeg(videoPath, wavOut);
+                    Console.WriteLine($">>> [YouTube API] [Job:{jobId}] Extracted audio successfully");
+
+                    await _queue.EnqueueAsync(job);
+                    Console.WriteLine($">>> [YouTube API] [Job:{jobId}] Job enqueued successfully");
+                }
+                 catch (Exception ex)
+                {
+                    job.Status = JobState.Failed;
+                    job.Error = ex.Message;
+                    Console.WriteLine($">>> [YouTube API] [Job:{jobId}] Exception: {ex}");
+                }
+            });
+
+            // ✅ Return immediately with job details (frontend can start polling)
+            var response = new
             {
                 type = "video",
-                backend = $"{job.PublicBase}//{job.JobId}.mp4",
-                fileName = safeName,
+                backend = $"{job.PublicBase}/{job.JobId}.mp4",
                 jobId = job.JobId,
                 statusUrl = $"/api/translate/status/{job.JobId}"
-            });
+            };
+
+            Console.WriteLine($">>> [YouTube API] Returning immediate response for job {jobId}");
+            return Ok(response);
         }
-
-
 
         // GET /api/translate/status/{jobId}
         [HttpGet("status/{jobId}")]

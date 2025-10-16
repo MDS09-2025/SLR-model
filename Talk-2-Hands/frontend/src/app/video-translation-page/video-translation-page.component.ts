@@ -120,5 +120,4 @@ export class VideoTranslationPageComponent implements OnInit {
       console.warn('No audio/video available to download');
     }
   }
-
 }
