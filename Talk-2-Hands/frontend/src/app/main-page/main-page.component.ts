@@ -9,18 +9,23 @@ import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { timer, EMPTY, forkJoin } from 'rxjs';
 import { switchMap, filter, takeUntil, take, map, catchError } from 'rxjs/operators';
 import { ThemeService } from '../services/theme.service';
+import { POPUP_ANIMATION } from '../models/constant';
 
 @Component({
   selector: 'app-main-page',
   imports: [NavBarComponent, FormsModule, CommonModule],
   templateUrl: './main-page.component.html',
-  styleUrl: './main-page.component.css'
+  styleUrl: './main-page.component.css',
+  animations: [POPUP_ANIMATION] 
 })
 export class MainPageComponent {
   mediaLink: string = '';
   selectedFile: File | null = null;
   loading = false;
   isDarkMode = false;
+  showPopup = false; 
+  popupTitle = 'Missing Media';
+  popupMessage = 'Please upload a file or paste a link before translating.';
 
   constructor(private translateService: TranslateService, private router: Router, private mediacontent: MediaTransferService, private theme: ThemeService) {}
 
@@ -58,6 +63,10 @@ export class MainPageComponent {
 
  translate() {
     // If a file was picked, upload to backend
+    if (!this.selectedFile && !this.mediaLink.trim()) {
+      this.showPopup = true;
+      return;
+    }
     if (this.selectedFile) {
       this.translateService.uploadFile(this.selectedFile).subscribe({
         next: (event: any) => {
@@ -109,6 +118,10 @@ export class MainPageComponent {
     }
     // Nothing provided
     console.warn('Please paste a link or upload a file.');
+  }
+
+  onClosePopup() {
+    this.showPopup = false;
   }
 }
 
