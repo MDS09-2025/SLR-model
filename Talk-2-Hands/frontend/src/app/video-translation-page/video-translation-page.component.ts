@@ -43,6 +43,12 @@ export class VideoTranslationPageComponent implements OnInit {
         this.videoSrc = `http://localhost:5027${mediaData.backend}`;
         this.gloss = mediaData.results?.gloss ?? null;
         console.log('Playing video from backend:', this.videoSrc);
+        setTimeout(() => {
+          const video = this.playerRef?.nativeElement;
+          if (video) {
+            video.load();  // force reload source
+          }
+        }, 1000);
         this.jobId = mediaData.jobId;
         this.fileName = mediaData.backend.split('/').pop(); 
         if (this.jobId) {
