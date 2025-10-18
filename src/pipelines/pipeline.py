@@ -162,7 +162,7 @@ def preprocess_single_file(file_info):
         return {"success": False, "file": fname, "error": str(e)}
 
 def preprocess_audio_parallel(input_dir="Raw_Audio", output_dir="Clean_Audio",
-                            target_sr=48000, noise_reduction=True, chunk_sec=10.0,
+                            target_sr=48000, noise_reduction=True, chunk_sec=30.0,
                             num_workers=4):
     """Parallel audio preprocessing"""
     ensure_empty_dir(output_dir)
@@ -917,9 +917,9 @@ def main():
     ap.add_argument("--no_noise_reduction", action="store_true")
 
     # ASR opts
-    ap.add_argument("--whisper_size", default="medium")
-    ap.add_argument("--asr_device", default="cpu", choices=["cpu","cuda","mps"])
-    ap.add_argument("--compute_type", default="float16")
+    ap.add_argument("--whisper_size", default="base")
+    ap.add_argument("--asr_device", default="mps", choices=["cpu","cuda","mps"])
+    ap.add_argument("--compute_type", default="int8")
     ap.add_argument("--beam_size", type=int, default=5)
 
     # Parallel processing options
@@ -953,9 +953,9 @@ def main():
             input_dir=args.raw_dir,
             output_dir=args.clean_dir,
             target_sr=args.target_sr,
-            noise_reduction=(not args.no_noise_reduction),
             chunk_sec=args.chunk_sec,
-            num_workers=args.preprocess_workers
+            num_workers=args.preprocess_workers,
+            noise_reduction = False
         )
 
     # Step 2

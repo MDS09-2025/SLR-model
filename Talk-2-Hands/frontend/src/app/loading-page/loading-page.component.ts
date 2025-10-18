@@ -13,7 +13,29 @@ import { ThemeService } from '../services/theme.service';
 })
 export class LoadingPageComponent {
   message = 'Processing your media...';
+  rotatingTitle = "";
+  rotatingText = "";
   isDarkMode = false;
+  private titles = [
+    "Why Talk-2 Hands?",
+    "Reading Boost!",
+    "The Bilingual Brain!",
+    "Visual Superpower!",
+    "A Different World of Words",
+    "Language is More Than Text!"
+  ]
+
+  private messages = [
+    "Many studies document that DHH learners often lag behind hearing peers in reading comprehension",
+    "Studies show that for Deaf adults, watching a sign language interpreter alongside text can nearly double their comprehension",
+    "Being fluent in American Sign Language (ASL) gives deaf children a powerful foundation, making them stronger English readers later on",
+    "The brains of deaf readers often activate visual processing areas more intensely than hearing readers, turning reading into a highly visual skill",
+    "For many native signers, learning to read English is like learning a second language that they have never heard spoken",
+    "For millions, sign language isn't just an alternative to text—it's the key to deeper, more natural engagement and understanding"
+  ];
+
+  private textIndex = 0;
+  private textInterval!: ReturnType<typeof setInterval>;
 
   constructor(
     private translateService: TranslateService,
@@ -23,6 +45,15 @@ export class LoadingPageComponent {
 
   ngOnInit(): void {
     this.theme.isDarkMode$.subscribe(mode => this.isDarkMode = mode);
+
+    this.rotatingText = this.messages[this.textIndex];
+    this.rotatingTitle = this.titles[this.textIndex];
+    
+    this.textInterval = setInterval(() => {
+      this.textIndex = (this.textIndex + 1) % this.messages.length;
+      this.rotatingText = this.messages[this.textIndex];
+      this.rotatingTitle = this.titles[this.textIndex];
+    }, 3000);
     const stored = sessionStorage.getItem('media');
     if (!stored) {
       this.message = 'No upload data found.';
