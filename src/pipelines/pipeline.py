@@ -917,11 +917,11 @@ def main():
     ap.add_argument("--no_noise_reduction", action="store_true")
 
     # ASR opts
-    ap.add_argument("--whisper_size", default="large-v3")
+    ap.add_argument("--whisper_size", default="medium")
     ap.add_argument("--asr_device", default="cpu", choices=["cpu","cuda","mps"])
-    ap.add_argument("--compute_type", default="float32")
+    ap.add_argument("--compute_type", default="float16")
     ap.add_argument("--beam_size", type=int, default=5)
-    
+
     # Parallel processing options
     ap.add_argument("--preprocess_workers", type=int, default=4)
     ap.add_argument("--asr_workers", type=int, default=2)
