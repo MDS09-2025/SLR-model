@@ -53,7 +53,7 @@ export class AudioTranslationPageComponent implements OnInit{
       console.log('[AudioTranslationPage] Parsed mediaData:', mediaData);
 
       if (mediaData.type === 'audio') {
-        this.audioUrl = 'http://localhost:5027' + mediaData.backend;
+        this.audioUrl = mediaData.backend;
         console.log('Playing audio from backend:', this.audioUrl);
 
         this.gloss = mediaData.results?.gloss ?? null;

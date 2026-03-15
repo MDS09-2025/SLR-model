@@ -40,7 +40,7 @@ export class VideoTranslationPageComponent implements OnInit {
       console.log('[VideoTranslationPage] Parsed mediaData:', mediaData);
 
       if (mediaData.type === 'video') {
-        this.videoSrc = `http://localhost:5027${mediaData.backend}`;
+        this.videoSrc = mediaData.backend;
         this.gloss = mediaData.results?.gloss ?? null;
         console.log('Playing video from backend:', this.videoSrc);
         setTimeout(() => {
