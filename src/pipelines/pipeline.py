@@ -30,6 +30,13 @@ import base64, cv2, subprocess
 from pose_format import Pose
 import json, os
 from tqdm import tqdm
+from faster_whisper import WhisperModel
+
+GLOBAL_WHISPER_MODEL = WhisperModel(
+    "small",        # or args.whisper_size if you want dynamic
+    device="cpu",    # or "cuda" or "cpu"
+    compute_type="int8"
+)
 
 # ---------------------------
 # Utility: ensure dir clean
@@ -291,121 +298,145 @@ def asr_worker_process(worker_id, model_size, asr_device, compute_type, beam_siz
                 })
             break
 
-def transcribe_dir_parallel(audio_dir, out_dir, model_size="medium",
-                          asr_device="cpu", compute_type="float32",
-                          beam_size=5, merged_out=None, num_workers=2):
-    """Parallel ASR transcription with grouped output"""
+# def transcribe_dir_parallel(audio_dir, out_dir, model_size="medium",
+#                           asr_device="cpu", compute_type="float32",
+#                           beam_size=5, merged_out=None, num_workers=2):
+#     """Parallel ASR transcription with grouped output"""
 
-    os.makedirs(out_dir, exist_ok=True)
-    exts = (".flac",)
-    files = [f for f in os.listdir(audio_dir) if f.lower().endswith(exts)]
+#     os.makedirs(out_dir, exist_ok=True)
+#     exts = (".flac",)
+#     files = [f for f in os.listdir(audio_dir) if f.lower().endswith(exts)]
     
-    if not files:
-        print("No audio files found for transcription")
-        return
+#     if not files:
+#         print("No audio files found for transcription")
+#         return
     
-    # Estimate total audio length
-    total_min = estimate_total_audio_minutes(audio_dir)
-    print(f"🕐 Estimated total audio length: {total_min:.2f} minutes")
+#     # Estimate total audio length
+#     total_min = estimate_total_audio_minutes(audio_dir)
+#     print(f"🕐 Estimated total audio length: {total_min:.2f} minutes")
 
-    # Auto-switch between sequential and parallel
-    if total_min < 2 * num_workers:
-        print(f"⚠️ Short total audio (< {2 * num_workers} min). Using single-process mode for efficiency.")
-        num_workers = 1
+#     # Auto-switch between sequential and parallel
+#     if total_min < 2 * num_workers:
+#         print(f"⚠️ Short total audio (< {2 * num_workers} min). Using single-process mode for efficiency.")
+#         num_workers = 1
     
-    # Group files by base name (for chunk reassembly)
-    groups = defaultdict(list)
-    for fname in files:
-        base = re.sub(r"_chunk\d+\.flac$", "", fname)
-        groups[base].append(fname)
+#     # Group files by base name (for chunk reassembly)
+#     groups = defaultdict(list)
+#     for fname in files:
+#         base = re.sub(r"_chunk\d+\.flac$", "", fname)
+#         groups[base].append(fname)
     
-    print(f"Found {len(files)} audio files")
+#     print(f"Found {len(files)} audio files")
 
-    # Memory management based on model size
-    if model_size in ["large", "large-v3"] and num_workers > 2:
-        print(f"Reducing to 2 workers for stability")
-        num_workers = min(2, num_workers)
-    elif model_size == "medium" and num_workers > 3:
-        print(f"Reducing to 3 workers for stability")
-        num_workers = min(3, num_workers)
+#     # Memory management based on model size
+#     if model_size in ["large", "large-v3"] and num_workers > 2:
+#         print(f"Reducing to 2 workers for stability")
+#         num_workers = min(2, num_workers)
+#     elif model_size == "medium" and num_workers > 3:
+#         print(f"Reducing to 3 workers for stability")
+#         num_workers = min(3, num_workers)
     
-    print(f"Starting parallel transcription with {num_workers} workers...")
+#     print(f"Starting parallel transcription with {num_workers} workers...")
     
-    # Create queues
-    work_queue = Queue()
-    result_queue = Queue()
+#     # Create queues
+#     work_queue = Queue()
+#     result_queue = Queue()
     
-    # Add all files to work queue
-    for fname in files:
-        work_queue.put(os.path.join(audio_dir, fname))
+#     # Add all files to work queue
+#     for fname in files:
+#         work_queue.put(os.path.join(audio_dir, fname))
     
-    # Add sentinel values for workers
-    for _ in range(num_workers):
-        work_queue.put(None)
+#     # Add sentinel values for workers
+#     for _ in range(num_workers):
+#         work_queue.put(None)
     
-    # Start worker processes
-    workers = []
-    for i in range(num_workers):
-        p = Process(
-            target=asr_worker_process,
-            args=(i, model_size, asr_device, compute_type, beam_size, 
-                  work_queue, result_queue)
-        )
-        p.start()
-        workers.append(p)
+#     # Start worker processes
+#     workers = []
+#     for i in range(num_workers):
+#         p = Process(
+#             target=asr_worker_process,
+#             args=(i, model_size, asr_device, compute_type, beam_size, 
+#                   work_queue, result_queue)
+#         )
+#         p.start()
+#         workers.append(p)
     
-    # Collect results
-    results = {}
-    completed = 0
+#     # Collect results
+#     results = {}
+#     completed = 0
     
-    while completed < len(files):
-        try:
-            result = result_queue.get(timeout=60)
+#     while completed < len(files):
+#         try:
+#             result = result_queue.get(timeout=60)
             
-            completed += 1
+#             completed += 1
             
-            if result["success"]:
-                results[result["file"]] = result["text"]
-                print(f"[{completed}/{len(files)}] Completed: {result['file']} (Worker {result['worker_id']})")
-            else:
-                print(f"[{completed}/{len(files)}] Failed: {result['file']} - {result['error']} (Worker {result['worker_id']})")
+#             if result["success"]:
+#                 results[result["file"]] = result["text"]
+#                 print(f"[{completed}/{len(files)}] Completed: {result['file']} (Worker {result['worker_id']})")
+#             else:
+#                 print(f"[{completed}/{len(files)}] Failed: {result['file']} - {result['error']} (Worker {result['worker_id']})")
                 
-        except Exception as e:
-            print(f"Error collecting results: {str(e)}")
-            print(f"Completed {completed}/{len(files)} files so far")
-            # Check if any workers are still alive
-            alive_workers = sum(1 for p in workers if p.is_alive())
-            print(f"Workers still alive: {alive_workers}")
-            if alive_workers == 0:
-                print("All workers have been shut down")
-                break
+#         except Exception as e:
+#             print(f"Error collecting results: {str(e)}")
+#             print(f"Completed {completed}/{len(files)} files so far")
+#             # Check if any workers are still alive
+#             alive_workers = sum(1 for p in workers if p.is_alive())
+#             print(f"Workers still alive: {alive_workers}")
+#             if alive_workers == 0:
+#                 print("All workers have been shut down")
+#                 break
 
-    # Clean up workers
-    cleanup_workers(workers)
+#     # Clean up workers
+#     cleanup_workers(workers)
     
-    print(f"Transcription completed: {len(results)}/{len(files)} files successful")
+#     print(f"Transcription completed: {len(results)}/{len(files)} files successful")
     
-    # Reassemble grouped transcripts
-    print("Reassembling grouped transcripts...")
-    for base, chunk_files in groups.items():
-        chunk_files.sort(key=lambda f: int(re.search(r"_chunk(\d+)", f).group(1)))
-        all_text = []
+#     # Reassemble grouped transcripts
+#     print("Reassembling grouped transcripts...")
+#     for base, chunk_files in groups.items():
+#         chunk_files.sort(key=lambda f: int(re.search(r"_chunk(\d+)", f).group(1)))
+#         all_text = []
         
-        for fname in chunk_files:
-            if fname in results:
-                all_text.extend(results[fname])
+#         for fname in chunk_files:
+#             if fname in results:
+#                 all_text.extend(results[fname])
         
-        # Save grouped transcript
-        out_path = os.path.join(out_dir, f"{base}.txt")
-        with open(out_path, "w") as f:
-            f.write("\n".join(all_text))
-        print(f"Saved grouped transcript: {out_path}")
+#         # Save grouped transcript
+#         out_path = os.path.join(out_dir, f"{base}.txt")
+#         with open(out_path, "w") as f:
+#             f.write("\n".join(all_text))
+#         print(f"Saved grouped transcript: {out_path}")
     
-    # Create merged output if requested
-    if merged_out is not None:
-        merge_transcripts(out_dir, merged_out)
+#     # Create merged output if requested
+#     if merged_out is not None:
+#         merge_transcripts(out_dir, merged_out)
     
-    print(f"Transcription completed!")
+#     print(f"Transcription completed!")
+
+def transcribe_dir_single(audio_dir, out_dir, fw_model, beam_size=5, merged_out=None):
+    import os, re
+    os.makedirs(out_dir, exist_ok=True)
+    files = [f for f in os.listdir(audio_dir) if f.lower().endswith(".flac")]
+    results = {}
+
+    for i, fname in enumerate(sorted(files), start=1):
+        path = os.path.join(audio_dir, fname)
+        print(f"[{i}/{len(files)}] Transcribing {fname}...")
+        segments, _ = fw_model.transcribe(path, beam_size=beam_size)
+        text = " ".join(seg.text.strip() for seg in segments if seg.text.strip())
+        results[fname] = text
+        with open(os.path.join(out_dir, f"{os.path.splitext(fname)[0]}.txt"), "w") as f:
+            f.write(text)
+
+    # Merge if requested
+    if merged_out:
+        with open(merged_out, "w") as f:
+            for fname in sorted(results.keys()):
+                f.write(results[fname] + "\n")
+        print(f"✅ Merged transcript saved to {merged_out}")
+
+    print(f"✅ Transcribed {len(results)} files with a shared model.")
 
 # ---------------------------
 # 3) Parallel Text → Gloss with T5
@@ -960,15 +991,14 @@ def main():
 
     # Step 2
     if args.transcribe:
-        transcribe_dir_parallel(
+        print("\n--- Step 2: Transcribing with pre-loaded Faster-Whisper ---")
+        fw_model = GLOBAL_WHISPER_MODEL
+        transcribe_dir_single(
             audio_dir=args.clean_dir,
             out_dir="Transcripts",
-            model_size=args.whisper_size,
-            asr_device=args.asr_device,
-            compute_type=args.compute_type,
+            fw_model=fw_model,
             beam_size=args.beam_size,
-            merged_out=args.transcript_txt,
-            num_workers=args.asr_workers
+            merged_out=args.transcript_txt
         )
 
     # Step 3

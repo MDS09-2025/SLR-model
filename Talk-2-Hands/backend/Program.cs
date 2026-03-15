@@ -59,6 +59,7 @@ app.Use((context, next) =>
 });
 
 app.UseCors();
+app.UseDefaultFiles();  
 
 // Serve everything in wwwroot
 app.UseStaticFiles();
@@ -110,4 +111,5 @@ if (app.Environment.IsDevelopment())
 // app.UseHttpsRedirection();
 app.UseCors("AllowAngularClient");
 app.MapControllers();
+app.MapFallbackToFile("index.html");
 app.Run();
