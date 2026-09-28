@@ -6,17 +6,32 @@ Talk2Hands is a Sign Language Recognition (SLR) system that processes hand gestu
 
 ## 🚀 Quick Start (Docker)
 
-Run the entire application with the following commands:
+### Prerequisites
+Before running Talk2Hands, make sure you have:
 
+- Docker Desktop installed
+- Docker Desktop launched and running
+
+### To run the application:
+
+#### 1. Clone the Repository
 ```bash
 git clone <your-repo-url>
 cd SLR-model/Talk-2-Hands/backend
-
-docker build -t talk2hands .
-docker run -p 8080:8080 talk2hands
 ```
 
-Then open your browser and go to:
+#### 2. Build the Docker Image
 ```bash
-http://localhost:8080
+docker build -t talk2hands -f Talk-2-Hands/backend/Dockerfile .
+```
+
+#### 3. Run the Application
+```bash
+docker run -d -p 5027:8080 --name talk2hands talk2hands
+```
+
+#### 4. Open the Application
+```bash
+http://localhost:5027
 ``` 
+> 💡 **Tip:** A sample video is provided in the `sample-video` directory. You can upload it to the application to quickly try out the Sign Language Recognition feature.
